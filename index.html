@@ -1996,6 +1996,25 @@
           { id: "com.system.uptime.mcp", scope: "LOCAL", needsNetwork: false, color: "var(--green)" }
         ];
 
+        /* ── Intent Config ─── */
+        let INTENT_CONFIG = [];
+        let INTENT_MAP = {};
+
+        fetch('static/intents.json').then(r => r.json()).then(data => {
+            INTENT_CONFIG = data;
+            INTENT_CONFIG.forEach(intent => {
+                intent.compiled_triggers = intent.triggers.map(p => new RegExp(p, 'i'));
+                if (intent.extraction) {
+                    intent.compiled_extraction = {};
+                    for (const key in intent.extraction) {
+                        intent.compiled_extraction[key] = new RegExp(intent.extraction[key], 'i');
+                    }
+                }
+                INTENT_MAP[intent.id] = intent;
+            });
+            console.log("Intents loaded:", INTENT_CONFIG.length);
+        }).catch(e => console.error("Failed to load intents.json", e));
+
         /* ── DOM ─── */
         const $ = s => document.querySelector(s);
         const dom = {
@@ -2445,119 +2464,112 @@
         }
 
         /* ── Classification ─── */
+        function buildResponse(intent, params, confidence) {
+            return {
+                supported: intent.properties.supported,
+                intent: intent.id,
+                confidence: confidence || intent.properties.confidence,
+                routeType: intent.properties.routeType,
+                servers: intent.properties.servers,
+                privacyClass: intent.properties.privacyClass,
+                params: params || {}
+            };
+        }
+
+        const INTENT_HANDLERS = {
+            "SET_TIMER": (t, intent) => {
+                const ext = intent.compiled_extraction;
+                const m = t.match(ext.duration_regex);
+                if (m) {
+                    const dur = `${m[1]} ${m[2]}s`;
+                    return buildResponse(intent, { duration: dur }, 0.96);
+                }
+                return { supported: true, intent: 'MISSING_SLOT', confidence: 0.90, routeType: 'local', servers: [], privacyClass: 'local_safe', params: { slot: "timer_duration", message: "For how long?" } };
+            },
+            "PLAY_MUSIC": (t, intent) => {
+                const query = t.replace(intent.compiled_extraction.removal_regex, '').trim();
+                return buildResponse(intent, { query: query || "jazz" });
+            },
+            "GET_WEATHER": (t, intent) => {
+                const m = t.match(intent.compiled_extraction.location_regex);
+                const loc = m ? m[1].trim() : "";
+                return buildResponse(intent, { location: loc });
+            },
+            "VOLUME_CONTROL": (t, intent) => {
+                const ext = intent.compiled_extraction;
+                const m = t.match(ext.level_regex);
+                const level = m ? parseInt(m[1]) : null;
+                const mute = ext.mute_regex.test(t) && !ext.unmute_regex.test(t);
+                const unmute = ext.unmute_regex.test(t);
+                return buildResponse(intent, { level, mute, unmute });
+            },
+            "CREATE_NOTE": (t, intent) => {
+                const body = t.replace(intent.compiled_extraction.body_removal_regex, '').trim();
+                return buildResponse(intent, { body: body || "New note from Voice MCP" });
+            },
+            "CREATE_REMINDER": (t, intent) => {
+                const body = t.replace(intent.compiled_extraction.body_removal_regex, '').trim();
+                return buildResponse(intent, { body: body || "Voice MCP reminder" });
+            },
+            "OPEN_FINDER": (t, intent) => {
+                const m = t.match(intent.compiled_extraction.folder_regex);
+                const folder = m ? m[1] : "Finder";
+                return buildResponse(intent, { folder });
+            },
+            "WEB_SEARCH": (t, intent) => {
+                const query = t.replace(intent.compiled_extraction.query_removal_regex, '').trim();
+                return buildResponse(intent, { query: query || "search" });
+            },
+            "OPEN_MAPS": (t, intent) => {
+                const query = t.replace(intent.compiled_extraction.query_removal_regex, '').trim();
+                return buildResponse(intent, { query: query || "current location" });
+            },
+            "OPEN_APP": (t, intent) => {
+                const m = t.match(intent.compiled_triggers[0]);
+                const app = m ? m[1] : "Finder";
+                return buildResponse(intent, { app });
+            },
+            "CALCULATE": (t, intent) => buildResponse(intent, { expression: t }),
+            "DEFINE_WORD": (t, intent) => {
+                const word = t.replace(intent.compiled_extraction.word_removal_regex, '').trim();
+                return buildResponse(intent, { word });
+            },
+            "CONVERT_CURRENCY": (t, intent) => buildResponse(intent, { query: t })
+        };
+
         function classify(text) {
           const t = text.toLowerCase();
 
           // Handle awaiting slot for multi-turn context
           if (dialogState.awaiting_slot === 'timer_duration') {
-            const m = t.match(/(\d+)\s*(minute|min|second|sec|hour|hr)/);
-            if (m) {
-              const dur = `${m[1]} ${m[2]}s`;
-              return { supported: true, intent: 'SET_TIMER', confidence: 0.98, routeType: 'local', servers: ['com.apple.timer.mcp'], privacyClass: 'local_safe', params: { duration: dur } };
-            }
-            const m2 = t.match(/^(\d+)$/);
-            if (m2) {
-              const dur = `${m2[1]} minutes`;
-              return { supported: true, intent: 'SET_TIMER', confidence: 0.96, routeType: 'local', servers: ['com.apple.timer.mcp'], privacyClass: 'local_safe', params: { duration: dur } };
-            }
+             const timerIntent = INTENT_MAP["SET_TIMER"];
+             if (timerIntent && timerIntent.compiled_extraction) {
+                const ext = timerIntent.compiled_extraction;
+                const m = t.match(ext.duration_regex);
+                if (m) {
+                  const dur = `${m[1]} ${m[2]}s`;
+                  return buildResponse(timerIntent, { duration: dur }, 0.98);
+                }
+                const m2 = t.match(ext.numeric_regex);
+                if (m2) {
+                  const dur = `${m2[1]} minutes`;
+                  return buildResponse(timerIntent, { duration: dur }, 0.96);
+                }
+             }
           }
 
-          // Memory / context
-          if (/(do that again|repeat|again|redo)/.test(t))
-            return { supported: true, intent: 'REPEAT_LAST', confidence: 0.95, routeType: 'local', servers: ['com.apple.clipboard.mcp'], privacyClass: 'local_safe' };
-          if (/(what did i|last command|history|what was)/.test(t))
-            return { supported: true, intent: 'RECALL_HISTORY', confidence: 0.93, routeType: 'local', servers: ['com.apple.clipboard.mcp'], privacyClass: 'local_safe' };
-          // Timer
-          if (/timer|countdown|alarm/.test(t)) {
-            const m = t.match(/(\d+)\s*(minute|min|second|sec|hour|hr)/);
-            if (m) {
-              const dur = `${m[1]} ${m[2]}s`;
-              return { supported: true, intent: 'SET_TIMER', confidence: 0.96, routeType: 'local', servers: ['com.apple.timer.mcp'], privacyClass: 'local_safe', params: { duration: dur } };
-            } else {
-              return { supported: true, intent: 'MISSING_SLOT', confidence: 0.90, routeType: 'local', servers: [], privacyClass: 'local_safe', params: { slot: "timer_duration", message: "For how long?" } };
-            }
-          }
-          // Music
-          if (/youtube|music|jazz|song|play|spotify/.test(t))
-            return { supported: true, intent: 'PLAY_MUSIC', confidence: 0.93, routeType: 'remote', servers: ['com.google.youtubemusic'], privacyClass: 'remote_media' };
-          // Weather
-          if (/weather|temperature|forecast|rain|sunny/.test(t))
-            return { supported: true, intent: 'GET_WEATHER', confidence: 0.94, routeType: 'remote', servers: ['com.apple.weather.mcp'], privacyClass: 'remote_data' };
-          // Screenshot
-          if (/screenshot|screen\s*cap|capture\s*(the\s*)?screen|snap/.test(t))
-            return { supported: true, intent: 'TAKE_SCREENSHOT', confidence: 0.95, routeType: 'local', servers: ['com.apple.screenshot.mcp'], privacyClass: 'local_safe' };
-          // Clipboard
-          if (/clipboard|paste|what.*copied|copy that/.test(t))
-            return { supported: true, intent: 'CLIPBOARD', confidence: 0.92, routeType: 'local', servers: ['com.apple.clipboard.mcp'], privacyClass: 'local_safe' };
-          // System info
-          if (/battery|cpu|memory|ram|disk|system\s*info|storage/.test(t))
-            return { supported: true, intent: 'SYSTEM_INFO', confidence: 0.94, routeType: 'local', servers: ['com.apple.systeminfo.mcp'], privacyClass: 'local_safe' };
-          // Volume
-          if (/volume|mute|unmute|louder|quieter|sound/.test(t))
-            return { supported: true, intent: 'VOLUME_CONTROL', confidence: 0.93, routeType: 'local', servers: ['com.apple.volume.mcp'], privacyClass: 'local_safe' };
-          // Notes
-          if (/(create|make|write|add)\s*(a\s*)?note/.test(t))
-            return { supported: true, intent: 'CREATE_NOTE', confidence: 0.91, routeType: 'local', servers: ['com.apple.notes.mcp'], privacyClass: 'local_safe' };
-          // Reminders
-          if (/remind|reminder/.test(t))
-            return { supported: true, intent: 'CREATE_REMINDER', confidence: 0.92, routeType: 'local', servers: ['com.apple.reminders.mcp'], privacyClass: 'local_safe' };
-          // Finder
-          if (/(open|show)\s*(the\s*)?(downloads?|documents?|desktop|home|finder|folder)/.test(t))
-            return { supported: true, intent: 'OPEN_FINDER', confidence: 0.93, routeType: 'local', servers: ['com.apple.finder.mcp'], privacyClass: 'local_safe' };
-          // Cross-context: Messages + Calendar
-          if (/message/.test(t) && /(follow-up|follow up|meeting|calendar)/.test(t))
-            return { supported: true, intent: 'FOLLOWUP_FROM_MESSAGE', confidence: 0.91, routeType: 'pcc', servers: ['com.apple.messages.mcp', 'com.apple.calendar.mcp'], privacyClass: 'cross_context_local' };
-          // Web search
-          if (/search|google|look up/.test(t))
-            return { supported: true, intent: 'WEB_SEARCH', confidence: 0.90, routeType: 'remote', servers: ['com.apple.websearch.mcp'], privacyClass: 'external_search' };
-          // Maps
-          if (/map|direction|navigate|where is/.test(t))
-            return { supported: true, intent: 'OPEN_MAPS', confidence: 0.92, routeType: 'remote', servers: ['com.apple.maps.mcp'], privacyClass: 'remote_data' };
-          // Send message
-          if (/send.*(message|text|imessage)/.test(t))
-            return { supported: true, intent: 'SEND_MESSAGE', confidence: 0.89, routeType: 'local', servers: ['com.apple.messages.mcp'], privacyClass: 'local_safe' };
-          // Calendar event
-          if (/(create|add|schedule|new).*(event|meeting|appointment)/.test(t))
-            return { supported: true, intent: 'CREATE_EVENT', confidence: 0.90, routeType: 'local', servers: ['com.apple.calendar.mcp'], privacyClass: 'local_safe' };
-          // Generic open app
-          if (/open\s+(\w+)/.test(t)) {
-            return { supported: true, intent: 'OPEN_APP', confidence: 0.88, routeType: 'local', servers: ['com.apple.finder.mcp'], privacyClass: 'local_safe' };
+          for (const intent of INTENT_CONFIG) {
+              if (intent.compiled_triggers && intent.compiled_triggers.every(regex => regex.test(t))) {
+                  const handler = INTENT_HANDLERS[intent.id];
+                  if (handler) {
+                      return handler(t, intent);
+                  } else {
+                      return buildResponse(intent);
+                  }
+              }
           }
 
-          // Date & Time
-          if (/time|date|day is it/.test(t) && !/calculate|math|times/.test(t)) // Avoid conflict with calculator
-            return { supported: true, intent: 'GET_DATE_TIME', confidence: 0.96, routeType: 'local', servers: ['com.apple.clock.mcp'], privacyClass: 'local_safe' };
-          // Calculator
-          if (/calculate|math|plus|minus|times|divided/.test(t))
-            return { supported: true, intent: 'CALCULATE', confidence: 0.95, routeType: 'local', servers: ['com.apple.calculator.mcp'], privacyClass: 'local_safe', params: { expression: t } };
-          // Joke
-          if (/joke|laugh/.test(t))
-            return { supported: true, intent: 'TELL_JOKE', confidence: 0.92, routeType: 'local', servers: ['com.entertainment.jokes.mcp'], privacyClass: 'local_safe' };
-          // Quote
-          if (/quote|inspire|wisdom|motivation/.test(t))
-            return { supported: true, intent: 'GET_QUOTE', confidence: 0.91, routeType: 'local', servers: ['com.entertainment.quotes.mcp'], privacyClass: 'local_safe' };
-          // Coin Flip
-          if (/flip.*coin|heads.*tails/.test(t))
-            return { supported: true, intent: 'FLIP_COIN', confidence: 0.94, routeType: 'local', servers: ['com.tools.random.mcp'], privacyClass: 'local_safe' };
-          // Dice Roll
-          if (/roll.*(die|dice)/.test(t))
-            return { supported: true, intent: 'ROLL_DIE', confidence: 0.94, routeType: 'local', servers: ['com.tools.random.mcp'], privacyClass: 'local_safe' };
-          // Dictionary
-          if (/define|meaning of|definition/.test(t)) {
-             const word = t.replace(/(define|meaning of|definition of|what is the)\s*/, '').trim();
-             return { supported: true, intent: 'DEFINE_WORD', confidence: 0.92, routeType: 'remote', servers: ['com.reference.dictionary.mcp'], privacyClass: 'external_search', params: { word } };
-          }
-          // Currency
-          if (/convert.*(currency|usd|eur|gbp|yen)|price of/.test(t))
-            return { supported: true, intent: 'CONVERT_CURRENCY', confidence: 0.90, routeType: 'remote', servers: ['com.finance.currency.mcp'], privacyClass: 'external_search', params: { query: t } };
-          // Local IP
-          if (/my ip|ip address/.test(t))
-            return { supported: true, intent: 'GET_IP', confidence: 0.95, routeType: 'local', servers: ['com.network.ip.mcp'], privacyClass: 'local_safe' };
-          // Uptime
-          if (/uptime|how long.*running/.test(t))
-            return { supported: true, intent: 'GET_UPTIME', confidence: 0.93, routeType: 'local', servers: ['com.system.uptime.mcp'], privacyClass: 'local_safe' };
-
-          return { supported: false, intent: 'UNSUPPORTED', confidence: 0.58, routeType: 'none', servers: [], privacyClass: 'unknown' };
+          return { supported: false, intent: 'UNSUPPORTED', confidence: 0.58, routeType: 'none', servers: [], privacyClass: 'unknown', params: {} };
         }
         function privacyCheck(plan, env) {
           if (plan.privacyClass === 'external_search' && env.privacyMode === 'ON') return { approved: false, label: 'BLOCKED · privacy mode ON' };

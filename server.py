@@ -28,38 +28,117 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Regex Patterns ────────────────────────────────────────────────────
-RE_TIMER_DURATION = re.compile(r'(\d+)\s*(minute|min|second|sec|hour|hr)')
-RE_TIMER_NUMERIC = re.compile(r'^(\d+)$')
-RE_REPEAT = re.compile(r'(do that again|repeat|again|redo)')
-RE_HISTORY = re.compile(r'(what did i|last command|history|what was)')
-RE_TIMER_KEYWORD = re.compile(r'timer|countdown|alarm')
-RE_MUSIC_KEYWORD = re.compile(r'youtube|music|jazz|song|play|spotify')
-RE_MUSIC_QUERY = re.compile(r'(play|on youtube music|on youtube|on spotify)')
-RE_WEATHER_KEYWORD = re.compile(r'weather|temperature|forecast|rain|sunny')
-RE_WEATHER_LOC = re.compile(r'(?:in|at|for)\s+(.+)')
-RE_SCREENSHOT = re.compile(r'screenshot|screen\s*cap|capture\s*(the\s*)?screen|snap')
-RE_CLIPBOARD = re.compile(r'clipboard|paste|what.*copied|copy that')
-RE_SYSINFO = re.compile(r'battery|cpu|memory|ram|disk|system\s*info|storage')
-RE_VOLUME_KEYWORD = re.compile(r'volume|mute|unmute|louder|quieter|sound')
-RE_VOLUME_LEVEL = re.compile(r'(\d+)')
-RE_VOLUME_MUTE = re.compile(r'mute')
-RE_VOLUME_UNMUTE = re.compile(r'unmute')
-RE_NOTE_KEYWORD = re.compile(r'(create|make|write|add)\s*(a\s*)?note')
-RE_NOTE_BODY = re.compile(r'(create|make|write|add)\s*(a\s*)?note\s*(saying|that says|with)?\s*')
-RE_REMINDER_KEYWORD = re.compile(r'remind|reminder')
-RE_REMINDER_BODY = re.compile(r'(remind me to|set a reminder to|add a reminder to|remind me)\s*')
-RE_FINDER_KEYWORD = re.compile(r'(open|show)\s*(the\s*)?(downloads?|documents?|desktop|home|finder|folder)')
-RE_FINDER_FOLDER = re.compile(r'(downloads?|documents?|desktop|home|finder)')
-RE_MESSAGE_KEYWORD = re.compile(r'message')
-RE_FOLLOWUP_KEYWORD = re.compile(r'follow-up|follow up|meeting|calendar')
-RE_SEARCH_KEYWORD = re.compile(r'search|google|look up')
-RE_SEARCH_QUERY = re.compile(r'(search|the web|for|on google|on the internet|google|look up)')
-RE_MAPS_KEYWORD = re.compile(r'map|direction|navigate|where is')
-RE_MAPS_QUERY = re.compile(r'(open maps? to|show me|navigate to|directions? to|where is)')
-RE_SEND_MSG = re.compile(r'send.*(message|text|imessage)')
-RE_CREATE_EVENT = re.compile(r'(create|add|schedule|new).*(event|meeting|appointment)')
-RE_OPEN_APP = re.compile(r'open\s+(\w+)')
+# ── Regex Patterns & Intent Config ────────────────────────────────────
+INTENT_CONFIG = []
+INTENT_MAP = {}
+try:
+    with open("static/intents.json", "r") as f:
+        INTENT_CONFIG = json.load(f)
+    for intent in INTENT_CONFIG:
+        intent["compiled_triggers"] = [re.compile(p, re.IGNORECASE) for p in intent["triggers"]]
+        if "extraction" in intent:
+            intent["compiled_extraction"] = {}
+            for key, pattern in intent["extraction"].items():
+                intent["compiled_extraction"][key] = re.compile(pattern, re.IGNORECASE)
+        INTENT_MAP[intent["id"]] = intent
+except Exception as e:
+    print(f"Error loading intents.json: {e}")
+
+# ── Handlers ──────────────────────────────────────────────────────────
+def build_response(intent, params=None, confidence=None):
+    return {
+        "supported": intent["properties"]["supported"],
+        "intent": intent["id"],
+        "confidence": confidence or intent["properties"]["confidence"],
+        "routeType": intent["properties"]["routeType"],
+        "servers": intent["properties"]["servers"],
+        "privacyClass": intent["properties"]["privacyClass"],
+        "params": params or {}
+    }
+
+def handle_set_timer(text, intent):
+    ext = intent.get("compiled_extraction", {})
+    m = ext.get("duration_regex").search(text)
+    if m:
+        dur = f"{m.group(1)} {m.group(2)}s"
+        raw = int(m.group(1))
+        unit = m.group(2)
+        secs = raw * (3600 if 'hour' in unit or 'hr' in unit else 60 if 'min' in unit else 1)
+        return build_response(intent, params={"duration": dur, "seconds": secs})
+    return {
+        "supported": True, "intent": "MISSING_SLOT", "confidence": 0.90,
+        "routeType": "local", "servers": [], "privacyClass": "local_safe",
+        "params": {"slot": "timer_duration", "message": "For how long?"}
+    }
+
+def handle_play_music(text, intent):
+    query = intent["compiled_extraction"]["removal_regex"].sub('', text).strip()
+    return build_response(intent, params={"query": query or "jazz"})
+
+def handle_get_weather(text, intent):
+    m = intent["compiled_extraction"]["location_regex"].search(text)
+    loc = m.group(1).strip() if m else ""
+    return build_response(intent, params={"location": loc})
+
+def handle_volume_control(text, intent):
+    ext = intent["compiled_extraction"]
+    m = ext["level_regex"].search(text)
+    level = int(m.group(1)) if m else None
+    mute = bool(ext["mute_regex"].search(text) and not ext["unmute_regex"].search(text))
+    unmute = bool(ext["unmute_regex"].search(text))
+    return build_response(intent, params={"level": level, "mute": mute, "unmute": unmute})
+
+def handle_create_note(text, intent):
+    body = intent["compiled_extraction"]["body_removal_regex"].sub('', text).strip()
+    return build_response(intent, params={"body": body or "New note from Voice MCP"})
+
+def handle_create_reminder(text, intent):
+    body = intent["compiled_extraction"]["body_removal_regex"].sub('', text).strip()
+    return build_response(intent, params={"body": body or "Voice MCP reminder"})
+
+def handle_open_finder(text, intent):
+    m = intent["compiled_extraction"]["folder_regex"].search(text)
+    folder = m.group(1) if m else "Finder"
+    return build_response(intent, params={"folder": folder})
+
+def handle_web_search(text, intent):
+    query = intent["compiled_extraction"]["query_removal_regex"].sub('', text).strip()
+    return build_response(intent, params={"query": query or "search"})
+
+def handle_open_maps(text, intent):
+    query = intent["compiled_extraction"]["query_removal_regex"].sub('', text).strip()
+    return build_response(intent, params={"query": query or "current location"})
+
+def handle_open_app(text, intent):
+    m = intent["compiled_triggers"][0].search(text)
+    app_name = m.group(1) if m else "Finder"
+    return build_response(intent, params={"app": app_name})
+
+def handle_calculate(text, intent):
+    return build_response(intent, params={"expression": text})
+
+def handle_define_word(text, intent):
+    word = intent["compiled_extraction"]["word_removal_regex"].sub('', text).strip()
+    return build_response(intent, params={"word": word})
+
+def handle_convert_currency(text, intent):
+    return build_response(intent, params={"query": text})
+
+INTENT_HANDLERS = {
+    "SET_TIMER": handle_set_timer,
+    "PLAY_MUSIC": handle_play_music,
+    "GET_WEATHER": handle_get_weather,
+    "VOLUME_CONTROL": handle_volume_control,
+    "CREATE_NOTE": handle_create_note,
+    "CREATE_REMINDER": handle_create_reminder,
+    "OPEN_FINDER": handle_open_finder,
+    "WEB_SEARCH": handle_web_search,
+    "OPEN_MAPS": handle_open_maps,
+    "OPEN_APP": handle_open_app,
+    "CALCULATE": handle_calculate,
+    "DEFINE_WORD": handle_define_word,
+    "CONVERT_CURRENCY": handle_convert_currency
+}
 
 
 # ── MCP Server Registry ──────────────────────────────────────────────
@@ -153,222 +232,44 @@ def classify(text: str, session_state: dict = None) -> dict:
 
     # Handle awaiting slot for timer duration
     if state.get("awaiting_slot") == "timer_duration":
-        # Check if the user is answering with a duration
-        m = RE_TIMER_DURATION.search(t)
-        if m:
-            dur = f"{m.group(1)} {m.group(2)}s"
-            raw = int(m.group(1))
-            unit = m.group(2)
-            secs = raw * (3600 if 'hour' in unit or 'hr' in unit else 60 if 'min' in unit else 1)
-            return {"supported": True, "intent": "SET_TIMER", "confidence": 0.98,
-                    "routeType": "local", "servers": ["com.apple.timer.mcp"],
-                    "privacyClass": "local_safe", "params": {"duration": dur, "seconds": secs}}
-        # If they didn't provide a duration, but it's just a number:
-        m2 = RE_TIMER_NUMERIC.search(t)
-        if m2:
-            dur = f"{m2.group(1)} minutes"
-            secs = int(m2.group(1)) * 60
-            return {"supported": True, "intent": "SET_TIMER", "confidence": 0.96,
-                    "routeType": "local", "servers": ["com.apple.timer.mcp"],
-                    "privacyClass": "local_safe", "params": {"duration": dur, "seconds": secs}}
-        # If they entirely changed the subject, fall through to normal classification
-        pass
+        timer_intent = INTENT_MAP.get("SET_TIMER")
+        if timer_intent:
+            ext = timer_intent["compiled_extraction"]
+            dur_re = ext["duration_regex"]
+            num_re = ext["numeric_regex"]
 
-    # Memory / context
-    if RE_REPEAT.search(t):
-        return {"supported": True, "intent": "REPEAT_LAST", "confidence": 0.95,
-                "routeType": "local", "servers": ["com.apple.clipboard.mcp"],
-                "privacyClass": "local_safe", "params": {}}
+            # Duration match
+            m = dur_re.search(t)
+            if m:
+                dur = f"{m.group(1)} {m.group(2)}s"
+                raw = int(m.group(1))
+                unit = m.group(2)
+                secs = raw * (3600 if 'hour' in unit or 'hr' in unit else 60 if 'min' in unit else 1)
+                return build_response(timer_intent, params={"duration": dur, "seconds": secs}, confidence=0.98)
 
-    if RE_HISTORY.search(t):
-        return {"supported": True, "intent": "RECALL_HISTORY", "confidence": 0.93,
-                "routeType": "local", "servers": ["com.apple.clipboard.mcp"],
-                "privacyClass": "local_safe", "params": {}}
+            # Numeric match
+            m2 = num_re.search(t)
+            if m2:
+                dur = f"{m2.group(1)} minutes"
+                secs = int(m2.group(1)) * 60
+                return build_response(timer_intent, params={"duration": dur, "seconds": secs}, confidence=0.96)
 
-    # Timer
-    if RE_TIMER_KEYWORD.search(t):
-        m = RE_TIMER_DURATION.search(t)
-        if m:
-            dur = f"{m.group(1)} {m.group(2)}s"
-            raw = int(m.group(1))
-            unit = m.group(2)
-            secs = raw * (3600 if 'hour' in unit or 'hr' in unit else 60 if 'min' in unit else 1)
-            return {"supported": True, "intent": "SET_TIMER", "confidence": 0.96,
-                    "routeType": "local", "servers": ["com.apple.timer.mcp"],
-                    "privacyClass": "local_safe", "params": {"duration": dur, "seconds": secs}}
-        else:
-            # Missing duration
-            return {"supported": True, "intent": "MISSING_SLOT", "confidence": 0.90,
-                    "routeType": "local", "servers": [], "privacyClass": "local_safe",
-                    "params": {"slot": "timer_duration", "message": "For how long?"}}
+        # Fall through
 
-    # Music
-    if RE_MUSIC_KEYWORD.search(t):
-        query = RE_MUSIC_QUERY.sub('', t).strip()
-        return {"supported": True, "intent": "PLAY_MUSIC", "confidence": 0.93,
-                "routeType": "remote", "servers": ["com.google.youtubemusic"],
-                "privacyClass": "remote_media", "params": {"query": query or "jazz"}}
+    # Iterate intents
+    for intent in INTENT_CONFIG:
+        # Check if ALL triggers match
+        if intent.get("compiled_triggers") and all(regex.search(t) for regex in intent["compiled_triggers"]):
+            handler = INTENT_HANDLERS.get(intent["id"])
+            if handler:
+                return handler(t, intent)
+            else:
+                return build_response(intent)
 
-    # Weather
-    if RE_WEATHER_KEYWORD.search(t):
-        m2 = RE_WEATHER_LOC.search(t)
-        loc = m2.group(1).strip() if m2 else ""
-        return {"supported": True, "intent": "GET_WEATHER", "confidence": 0.94,
-                "routeType": "remote", "servers": ["com.apple.weather.mcp"],
-                "privacyClass": "remote_data", "params": {"location": loc}}
-
-    # Screenshot
-    if RE_SCREENSHOT.search(t):
-        return {"supported": True, "intent": "TAKE_SCREENSHOT", "confidence": 0.95,
-                "routeType": "local", "servers": ["com.apple.screenshot.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # Clipboard
-    if RE_CLIPBOARD.search(t):
-        return {"supported": True, "intent": "CLIPBOARD", "confidence": 0.92,
-                "routeType": "local", "servers": ["com.apple.clipboard.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # System info
-    if RE_SYSINFO.search(t):
-        return {"supported": True, "intent": "SYSTEM_INFO", "confidence": 0.94,
-                "routeType": "local", "servers": ["com.apple.systeminfo.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # Volume
-    if RE_VOLUME_KEYWORD.search(t):
-        m3 = RE_VOLUME_LEVEL.search(t)
-        level = int(m3.group(1)) if m3 else None
-        mute = bool(RE_VOLUME_MUTE.search(t) and not RE_VOLUME_UNMUTE.search(t))
-        unmute = bool(RE_VOLUME_UNMUTE.search(t))
-        return {"supported": True, "intent": "VOLUME_CONTROL", "confidence": 0.93,
-                "routeType": "local", "servers": ["com.apple.volume.mcp"],
-                "privacyClass": "local_safe", "params": {"level": level, "mute": mute, "unmute": unmute}}
-
-    # Notes
-    if RE_NOTE_KEYWORD.search(t):
-        body = RE_NOTE_BODY.sub('', t).strip()
-        return {"supported": True, "intent": "CREATE_NOTE", "confidence": 0.91,
-                "routeType": "local", "servers": ["com.apple.notes.mcp"],
-                "privacyClass": "local_safe", "params": {"body": body or "New note from Voice MCP"}}
-
-    # Reminders
-    if RE_REMINDER_KEYWORD.search(t):
-        body = RE_REMINDER_BODY.sub('', t).strip()
-        return {"supported": True, "intent": "CREATE_REMINDER", "confidence": 0.92,
-                "routeType": "local", "servers": ["com.apple.reminders.mcp"],
-                "privacyClass": "local_safe", "params": {"body": body or "Voice MCP reminder"}}
-
-    # Finder
-    if RE_FINDER_KEYWORD.search(t):
-        m4 = RE_FINDER_FOLDER.search(t)
-        folder = m4.group(1) if m4 else "Finder"
-        return {"supported": True, "intent": "OPEN_FINDER", "confidence": 0.93,
-                "routeType": "local", "servers": ["com.apple.finder.mcp"],
-                "privacyClass": "local_safe", "params": {"folder": folder}}
-
-    # Messages + Calendar (cross-context)
-    if RE_MESSAGE_KEYWORD.search(t) and RE_FOLLOWUP_KEYWORD.search(t):
-        return {"supported": True, "intent": "FOLLOWUP_FROM_MESSAGE", "confidence": 0.91,
-                "routeType": "pcc", "servers": ["com.apple.messages.mcp", "com.apple.calendar.mcp"],
-                "privacyClass": "cross_context_local", "params": {}}
-
-    # Web search
-    if RE_SEARCH_KEYWORD.search(t):
-        query = RE_SEARCH_QUERY.sub('', t).strip()
-        return {"supported": True, "intent": "WEB_SEARCH", "confidence": 0.90,
-                "routeType": "remote", "servers": ["com.apple.websearch.mcp"],
-                "privacyClass": "external_search", "params": {"query": query or "search"}}
-
-    # Maps
-    if RE_MAPS_KEYWORD.search(t):
-        query = RE_MAPS_QUERY.sub('', t).strip()
-        return {"supported": True, "intent": "OPEN_MAPS", "confidence": 0.92,
-                "routeType": "remote", "servers": ["com.apple.maps.mcp"],
-                "privacyClass": "remote_data", "params": {"query": query or "current location"}}
-
-    # Send message
-    if RE_SEND_MSG.search(t):
-        return {"supported": True, "intent": "SEND_MESSAGE", "confidence": 0.89,
-                "routeType": "local", "servers": ["com.apple.messages.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # Calendar event
-    if RE_CREATE_EVENT.search(t):
-        return {"supported": True, "intent": "CREATE_EVENT", "confidence": 0.90,
-                "routeType": "local", "servers": ["com.apple.calendar.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # Generic open app
-    if RE_OPEN_APP.search(t):
-        app_name = RE_OPEN_APP.search(t).group(1)
-        return {"supported": True, "intent": "OPEN_APP", "confidence": 0.88,
-                "routeType": "local", "servers": ["com.apple.finder.mcp"],
-                "privacyClass": "local_safe", "params": {"app": app_name}}
-
-    # Date & Time
-    if re.search(r'\btime\b|date|day is it', t):
-        return {"supported": True, "intent": "GET_DATE_TIME", "confidence": 0.96,
-                "routeType": "local", "servers": ["com.apple.clock.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # Calculator
-    if re.search(r'calculate|math|plus|minus|times|divided', t):
-        return {"supported": True, "intent": "CALCULATE", "confidence": 0.95,
-                "routeType": "local", "servers": ["com.apple.calculator.mcp"],
-                "privacyClass": "local_safe", "params": {"expression": t}}
-
-    # Joke
-    if re.search(r'joke|laugh', t):
-        return {"supported": True, "intent": "TELL_JOKE", "confidence": 0.92,
-                "routeType": "local", "servers": ["com.entertainment.jokes.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # Quote
-    if re.search(r'quote|inspire|wisdom|motivation', t):
-        return {"supported": True, "intent": "GET_QUOTE", "confidence": 0.91,
-                "routeType": "local", "servers": ["com.entertainment.quotes.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # Coin Flip
-    if re.search(r'flip.*coin|heads.*tails', t):
-        return {"supported": True, "intent": "FLIP_COIN", "confidence": 0.94,
-                "routeType": "local", "servers": ["com.tools.random.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # Dice Roll
-    if re.search(r'roll.*(die|dice)', t):
-        return {"supported": True, "intent": "ROLL_DIE", "confidence": 0.94,
-                "routeType": "local", "servers": ["com.tools.random.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # Dictionary
-    if re.search(r'define|meaning of|definition', t):
-        word = re.sub(r'(define|meaning of|definition of|what is the)\s*', '', t).strip()
-        return {"supported": True, "intent": "DEFINE_WORD", "confidence": 0.92,
-                "routeType": "remote", "servers": ["com.reference.dictionary.mcp"],
-                "privacyClass": "external_search", "params": {"word": word}}
-
-    # Currency
-    if re.search(r'convert.*(currency|usd|eur|gbp|yen)|price of', t):
-        return {"supported": True, "intent": "CONVERT_CURRENCY", "confidence": 0.90,
-                "routeType": "remote", "servers": ["com.finance.currency.mcp"],
-                "privacyClass": "external_search", "params": {"query": t}}
-
-    # Local IP
-    if re.search(r'my ip|ip address', t):
-        return {"supported": True, "intent": "GET_IP", "confidence": 0.95,
-                "routeType": "local", "servers": ["com.network.ip.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # Uptime
-    if re.search(r'uptime|how long.*running', t):
-        return {"supported": True, "intent": "GET_UPTIME", "confidence": 0.93,
-                "routeType": "local", "servers": ["com.system.uptime.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    return {"supported": False, "intent": "UNSUPPORTED", "confidence": 0.58,
-            "routeType": "none", "servers": [], "privacyClass": "unknown", "params": {}}
+    return {
+        "supported": False, "intent": "UNSUPPORTED", "confidence": 0.58,
+        "routeType": "none", "servers": [], "privacyClass": "unknown", "params": {}
+    }
 
 
 # ── Privacy & Route ───────────────────────────────────────────────────
@@ -785,7 +686,7 @@ def get_history():
 def root():
     return FileResponse("index.html")
 
-app.mount("/static", StaticFiles(directory="."), name="static")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 if __name__ == "__main__":
     print("\n  🎙  Real Time Voice MCP — Backend Server")
