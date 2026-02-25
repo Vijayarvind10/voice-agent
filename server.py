@@ -390,237 +390,273 @@ def route_check(plan, network_mode):
 
 
 # ── Real Execution ────────────────────────────────────────────────────
+def handle_missing_slot(p):
+    return {"log": "dialogue · clarifying", "entityId": f"dlg_{uid()}", "response": p.get("message", "Can you clarify?")}
+
+def handle_repeat_last(p):
+    if len(conversation_history) > 1:
+        last = conversation_history[-1]
+        return {"log": f"replay · {last['intent']}", "entityId": f"replay_{uid()}",
+                "response": f"Repeating: {last['response']}"}
+    return {"log": "no history", "entityId": "none", "response": "No previous command to repeat"}
+
+def handle_recall_history(p):
+    if conversation_history:
+        recent = conversation_history[-3:]
+        summary = " → ".join([h["intent"] for h in recent])
+        return {"log": f"history · {len(conversation_history)} turns", "entityId": f"hist_{uid()}",
+                "response": f"Recent: {summary}"}
+    return {"log": "empty history", "entityId": "none", "response": "No command history yet"}
+
+def handle_set_timer(p):
+    secs = p.get("seconds", 600)
+    dur = p.get("duration", "10 minutes")
+    run_osascript(f'display notification "Timer set for {dur}" with title "Voice MCP" sound name "Tink"')
+    subprocess.Popen(["bash", "-c",
+        f'sleep {secs} && osascript -e \'display notification "⏱ Timer done!" with title "Voice MCP" sound name "Glass"\''])
+    return {"log": f"timer · armed for {dur}", "entityId": f"timer_{uid()}",
+            "response": f"Timer set for {dur}"}
+
+def handle_play_music(p):
+    q = urllib.parse.quote_plus(p.get("query", "jazz"))
+    run_open(f"https://music.youtube.com/search?q={q}")
+    return {"log": f"youtube_music · '{p.get('query','jazz')}'", "entityId": f"music_{uid()}",
+            "response": f"Opening YouTube Music — {p.get('query','jazz')}"}
+
+def handle_get_weather(p):
+    loc = p.get("location", "")
+    loc_param = urllib.parse.quote_plus(loc) if loc else ""
+    try:
+        r = subprocess.run(["curl", "-s", f"https://wttr.in/{loc_param}?format=3"], capture_output=True, text=True, timeout=5)
+        weather = r.stdout.strip() or "Weather data unavailable"
+    except:
+        weather = "Could not fetch weather"
+    return {"log": f"weather · {loc or 'local'}", "entityId": f"weather_{uid()}",
+            "response": weather}
+
+def handle_take_screenshot(p):
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    path = os.path.expanduser(f"~/Desktop/screenshot_{ts}.png")
+    run_cmd(["screencapture", "-x", path])
+    return {"log": f"screenshot · {path}", "entityId": f"ss_{uid()}",
+            "response": f"Screenshot saved to Desktop"}
+
+def handle_clipboard(p):
+    content = run_cmd(["pbpaste"])
+    preview = content[:100] + ("..." if len(content) > 100 else "")
+    return {"log": "clipboard · read", "entityId": f"clip_{uid()}",
+            "response": f"Clipboard: {preview}" if content else "Clipboard is empty"}
+
+def handle_system_info(p):
+    battery = run_cmd(["pmset", "-g", "batt"])
+    bat_match = re.search(r'(\d+)%', battery)
+    bat_pct = bat_match.group(1) + "%" if bat_match else "N/A"
+    mem = run_cmd(["sysctl", "-n", "hw.memsize"])
+    try: mem_gb = f"{int(mem) / (1024**3):.0f}GB"
+    except: mem_gb = "N/A"
+    cpu = run_cmd(["sysctl", "-n", "machdep.cpu.brand_string"])
+    disk = run_cmd(["df", "-h", "/"])
+    disk_match = re.search(r'(\d+)%', disk)
+    disk_used = disk_match.group(0) if disk_match else "N/A"
+    return {"log": "sysinfo · fetched", "entityId": f"sys_{uid()}",
+            "response": f"Battery: {bat_pct} · RAM: {mem_gb} · CPU: {cpu[:40]} · Disk: {disk_used} used"}
+
+def handle_volume_control(p):
+    if p.get("mute"):
+        run_osascript('set volume with output muted')
+        return {"log": "volume · muted", "entityId": f"vol_{uid()}", "response": "Volume muted"}
+    if p.get("unmute"):
+        run_osascript('set volume without output muted')
+        return {"log": "volume · unmuted", "entityId": f"vol_{uid()}", "response": "Volume unmuted"}
+    level = p.get("level")
+    if level is not None:
+        apple_vol = max(0, min(100, level)) / 100 * 7
+        run_osascript(f'set volume output volume {level}')
+        return {"log": f"volume · set to {level}%", "entityId": f"vol_{uid()}", "response": f"Volume set to {level}%"}
+    return {"log": "volume · no action", "entityId": f"vol_{uid()}", "response": "Say 'set volume to 50' or 'mute'"}
+
+def handle_create_note(p):
+    body = escape_osascript(p.get("body", "Note from Voice MCP"))
+    run_osascript(f'''
+        tell application "Notes"
+            activate
+            tell account "iCloud"
+                make new note at folder "Notes" with properties {{body:"{body}"}}
+            end tell
+        end tell
+    ''')
+    return {"log": f"notes · created", "entityId": f"note_{uid()}",
+            "response": f"Note created: {body[:60]}"}
+
+def handle_create_reminder(p):
+    body = escape_osascript(p.get("body", "Reminder"))
+    run_osascript(f'''
+        tell application "Reminders"
+            activate
+            tell list "Reminders"
+                make new reminder with properties {{name:"{body}"}}
+            end tell
+        end tell
+    ''')
+    return {"log": f"reminders · added", "entityId": f"rem_{uid()}",
+            "response": f"Reminder added: {body[:60]}"}
+
+def handle_open_finder(p):
+    folder = p.get("folder", "Finder").lower()
+    paths = {"downloads": "~/Downloads", "documents": "~/Documents", "desktop": "~/Desktop", "home": "~", "finder": "~"}
+    path = os.path.expanduser(paths.get(folder, "~"))
+    run_open(path)
+    return {"log": f"finder · {folder}", "entityId": f"finder_{uid()}",
+            "response": f"Opened {folder.capitalize()} folder"}
+
+def handle_followup_from_message(p):
+    run_open("/System/Applications/Messages.app")
+    run_open("/System/Applications/Calendar.app")
+    return {"log": "messages + calendar · opened", "entityId": f"followup_{uid()}",
+            "response": "Opened Messages and Calendar"}
+
+def handle_web_search(p):
+    q = urllib.parse.quote_plus(p.get("query", "search"))
+    run_open(f"https://www.google.com/search?q={q}")
+    return {"log": f"web_search · '{p.get('query','')}'", "entityId": f"search_{uid()}",
+            "response": f"Searching for '{p.get('query','')}'"}
+
+def handle_open_maps(p):
+    q = urllib.parse.quote_plus(p.get("query", ""))
+    run_open(f"https://maps.apple.com/?q={q}")
+    return {"log": f"maps · '{p.get('query','')}'", "entityId": f"maps_{uid()}",
+            "response": f"Opening Apple Maps — {p.get('query','')}"}
+
+def handle_send_message(p):
+    run_open("/System/Applications/Messages.app")
+    return {"log": "messages · opened", "entityId": f"msg_{uid()}", "response": "Opening Messages"}
+
+def handle_create_event(p):
+    run_open("/System/Applications/Calendar.app")
+    run_osascript('tell application "Calendar" to activate')
+    return {"log": "calendar · opened", "entityId": f"event_{uid()}", "response": "Opening Calendar"}
+
+def handle_open_app(p):
+    app = p.get("app", "Finder")
+    subprocess.Popen(["open", "-a", app.capitalize()])
+    return {"log": f"{app} · launched", "entityId": f"app_{uid()}", "response": f"Opening {app.capitalize()}"}
+
+def handle_get_date_time(p):
+    now = run_cmd(["date"])
+    return {"log": "clock · fetched", "entityId": f"time_{uid()}", "response": f"It is {now}"}
+
+def handle_calculate(p):
+    # Safe eval for demo purposes
+    expr = p.get("expression", "")
+    # Replace common words with operators
+    expr = expr.lower().replace("plus", "+").replace("minus", "-").replace("times", "*").replace("divided by", "/").replace("over", "/")
+    # Very basic sanitization
+    clean_expr = re.sub(r'[^\d+\-*/().]', '', expr)
+    try:
+        # pylint: disable=eval-used
+        res = eval(clean_expr, {"__builtins__": None}, {})
+        return {"log": "calc · computed", "entityId": f"calc_{uid()}", "response": f"The answer is {res}"}
+    except:
+         return {"log": "calc · error", "entityId": f"err_{uid()}", "response": "I couldn't calculate that"}
+
+def handle_tell_joke(p):
+    jokes = [
+        "Why do programmers prefer dark mode? Because light attracts bugs.",
+        "I ordered a chicken and an egg from Amazon. I'll let you know.",
+        "What is a cloud's favourite number? Seven. Because seven ate nine, and it was overcast.",
+        "I told my wife she was drawing her eyebrows too high. She looked surprised."
+    ]
+    joke = random.choice(jokes)
+    return {"log": "joke · told", "entityId": f"joke_{uid()}", "response": joke}
+
+def handle_get_quote(p):
+    quotes = [
+        "The only way to do great work is to love what you do. — Steve Jobs",
+        "Code is like humor. When you have to explain it, it’s bad. — Cory House",
+        "Simplicity is the soul of efficiency. — Austin Freeman",
+        "Talk is cheap. Show me the code. — Linus Torvalds"
+    ]
+    quote = random.choice(quotes)
+    return {"log": "quote · fetched", "entityId": f"quote_{uid()}", "response": quote}
+
+def handle_flip_coin(p):
+    res = random.choice(["Heads", "Tails"])
+    return {"log": "coin · flipped", "entityId": f"coin_{uid()}", "response": res}
+
+def handle_roll_die(p):
+    res = str(random.randint(1, 6))
+    return {"log": "die · rolled", "entityId": f"die_{uid()}", "response": res}
+
+def handle_define_word(p):
+    w = p.get("word", "unknown")
+    # Mock definition
+    return {"log": "dictionary · defined", "entityId": f"def_{uid()}", "response": f"Definition of {w}: A word used in this demo."}
+
+def handle_convert_currency(p):
+    # Mock conversion
+    return {"log": "currency · converted", "entityId": f"curr_{uid()}", "response": "1 USD is approximately 0.94 EUR"}
+
+def handle_get_ip(p):
+    # Try to get local IP
+    try:
+        # This works on macOS/Linux usually
+        ip = run_cmd(["ifconfig"])
+        # Extract first non-loopback IP for demo (very rough regex)
+        m = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', ip)
+        my_ip = m.group(1) if m else "127.0.0.1"
+        if my_ip == "127.0.0.1":
+            # Try another way
+            my_ip = subprocess.getoutput("hostname -I").split()[0]
+    except:
+        my_ip = "Unknown"
+    return {"log": "ip · fetched", "entityId": f"ip_{uid()}", "response": f"Your IP address is {my_ip}"}
+
+def handle_get_uptime(p):
+    up = run_cmd(["uptime"])
+    # Format: 10:00  up 1 day, 20 mins, 2 users, load averages: ...
+    return {"log": "uptime · fetched", "entityId": f"uptime_{uid()}", "response": f"System status: {up.split(',')[0]}"}
+
+def handle_default(p):
+    return {"log": "no-op", "entityId": "none", "response": "I couldn't handle that command"}
+
+INTENT_HANDLERS = {
+    "MISSING_SLOT": handle_missing_slot,
+    "REPEAT_LAST": handle_repeat_last,
+    "RECALL_HISTORY": handle_recall_history,
+    "SET_TIMER": handle_set_timer,
+    "PLAY_MUSIC": handle_play_music,
+    "GET_WEATHER": handle_get_weather,
+    "TAKE_SCREENSHOT": handle_take_screenshot,
+    "CLIPBOARD": handle_clipboard,
+    "SYSTEM_INFO": handle_system_info,
+    "VOLUME_CONTROL": handle_volume_control,
+    "CREATE_NOTE": handle_create_note,
+    "CREATE_REMINDER": handle_create_reminder,
+    "OPEN_FINDER": handle_open_finder,
+    "FOLLOWUP_FROM_MESSAGE": handle_followup_from_message,
+    "WEB_SEARCH": handle_web_search,
+    "OPEN_MAPS": handle_open_maps,
+    "SEND_MESSAGE": handle_send_message,
+    "CREATE_EVENT": handle_create_event,
+    "OPEN_APP": handle_open_app,
+    "GET_DATE_TIME": handle_get_date_time,
+    "CALCULATE": handle_calculate,
+    "TELL_JOKE": handle_tell_joke,
+    "GET_QUOTE": handle_get_quote,
+    "FLIP_COIN": handle_flip_coin,
+    "ROLL_DIE": handle_roll_die,
+    "DEFINE_WORD": handle_define_word,
+    "CONVERT_CURRENCY": handle_convert_currency,
+    "GET_IP": handle_get_ip,
+    "GET_UPTIME": handle_get_uptime,
+}
+
 def execute(plan: dict) -> dict:
     intent = plan["intent"]
     p = plan["params"]
 
-    if intent == "MISSING_SLOT":
-        return {"log": "dialogue · clarifying", "entityId": f"dlg_{uid()}", "response": p.get("message", "Can you clarify?")}
-
-    if intent == "REPEAT_LAST":
-        if len(conversation_history) > 1:
-            last = conversation_history[-1]
-            return {"log": f"replay · {last['intent']}", "entityId": f"replay_{uid()}",
-                    "response": f"Repeating: {last['response']}"}
-        return {"log": "no history", "entityId": "none", "response": "No previous command to repeat"}
-
-    if intent == "RECALL_HISTORY":
-        if conversation_history:
-            recent = conversation_history[-3:]
-            summary = " → ".join([h["intent"] for h in recent])
-            return {"log": f"history · {len(conversation_history)} turns", "entityId": f"hist_{uid()}",
-                    "response": f"Recent: {summary}"}
-        return {"log": "empty history", "entityId": "none", "response": "No command history yet"}
-
-    if intent == "SET_TIMER":
-        secs = p.get("seconds", 600)
-        dur = p.get("duration", "10 minutes")
-        run_osascript(f'display notification "Timer set for {dur}" with title "Voice MCP" sound name "Tink"')
-        subprocess.Popen(["bash", "-c",
-            f'sleep {secs} && osascript -e \'display notification "⏱ Timer done!" with title "Voice MCP" sound name "Glass"\''])
-        return {"log": f"timer · armed for {dur}", "entityId": f"timer_{uid()}",
-                "response": f"Timer set for {dur}"}
-
-    if intent == "PLAY_MUSIC":
-        q = urllib.parse.quote_plus(p.get("query", "jazz"))
-        run_open(f"https://music.youtube.com/search?q={q}")
-        return {"log": f"youtube_music · '{p.get('query','jazz')}'", "entityId": f"music_{uid()}",
-                "response": f"Opening YouTube Music — {p.get('query','jazz')}"}
-
-    if intent == "GET_WEATHER":
-        loc = p.get("location", "")
-        loc_param = urllib.parse.quote_plus(loc) if loc else ""
-        try:
-            r = subprocess.run(["curl", "-s", f"https://wttr.in/{loc_param}?format=3"], capture_output=True, text=True, timeout=5)
-            weather = r.stdout.strip() or "Weather data unavailable"
-        except:
-            weather = "Could not fetch weather"
-        return {"log": f"weather · {loc or 'local'}", "entityId": f"weather_{uid()}",
-                "response": weather}
-
-    if intent == "TAKE_SCREENSHOT":
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = os.path.expanduser(f"~/Desktop/screenshot_{ts}.png")
-        run_cmd(["screencapture", "-x", path])
-        return {"log": f"screenshot · {path}", "entityId": f"ss_{uid()}",
-                "response": f"Screenshot saved to Desktop"}
-
-    if intent == "CLIPBOARD":
-        content = run_cmd(["pbpaste"])
-        preview = content[:100] + ("..." if len(content) > 100 else "")
-        return {"log": "clipboard · read", "entityId": f"clip_{uid()}",
-                "response": f"Clipboard: {preview}" if content else "Clipboard is empty"}
-
-    if intent == "SYSTEM_INFO":
-        battery = run_cmd(["pmset", "-g", "batt"])
-        bat_match = re.search(r'(\d+)%', battery)
-        bat_pct = bat_match.group(1) + "%" if bat_match else "N/A"
-        mem = run_cmd(["sysctl", "-n", "hw.memsize"])
-        try: mem_gb = f"{int(mem) / (1024**3):.0f}GB"
-        except: mem_gb = "N/A"
-        cpu = run_cmd(["sysctl", "-n", "machdep.cpu.brand_string"])
-        disk = run_cmd(["df", "-h", "/"])
-        disk_match = re.search(r'(\d+)%', disk)
-        disk_used = disk_match.group(0) if disk_match else "N/A"
-        return {"log": "sysinfo · fetched", "entityId": f"sys_{uid()}",
-                "response": f"Battery: {bat_pct} · RAM: {mem_gb} · CPU: {cpu[:40]} · Disk: {disk_used} used"}
-
-    if intent == "VOLUME_CONTROL":
-        if p.get("mute"):
-            run_osascript('set volume with output muted')
-            return {"log": "volume · muted", "entityId": f"vol_{uid()}", "response": "Volume muted"}
-        if p.get("unmute"):
-            run_osascript('set volume without output muted')
-            return {"log": "volume · unmuted", "entityId": f"vol_{uid()}", "response": "Volume unmuted"}
-        level = p.get("level")
-        if level is not None:
-            apple_vol = max(0, min(100, level)) / 100 * 7
-            run_osascript(f'set volume output volume {level}')
-            return {"log": f"volume · set to {level}%", "entityId": f"vol_{uid()}", "response": f"Volume set to {level}%"}
-        return {"log": "volume · no action", "entityId": f"vol_{uid()}", "response": "Say 'set volume to 50' or 'mute'"}
-
-    if intent == "CREATE_NOTE":
-        body = escape_osascript(p.get("body", "Note from Voice MCP"))
-        run_osascript(f'''
-            tell application "Notes"
-                activate
-                tell account "iCloud"
-                    make new note at folder "Notes" with properties {{body:"{body}"}}
-                end tell
-            end tell
-        ''')
-        return {"log": f"notes · created", "entityId": f"note_{uid()}",
-                "response": f"Note created: {body[:60]}"}
-
-    if intent == "CREATE_REMINDER":
-        body = escape_osascript(p.get("body", "Reminder"))
-        run_osascript(f'''
-            tell application "Reminders"
-                activate
-                tell list "Reminders"
-                    make new reminder with properties {{name:"{body}"}}
-                end tell
-            end tell
-        ''')
-        return {"log": f"reminders · added", "entityId": f"rem_{uid()}",
-                "response": f"Reminder added: {body[:60]}"}
-
-    if intent == "OPEN_FINDER":
-        folder = p.get("folder", "Finder").lower()
-        paths = {"downloads": "~/Downloads", "documents": "~/Documents", "desktop": "~/Desktop", "home": "~", "finder": "~"}
-        path = os.path.expanduser(paths.get(folder, "~"))
-        run_open(path)
-        return {"log": f"finder · {folder}", "entityId": f"finder_{uid()}",
-                "response": f"Opened {folder.capitalize()} folder"}
-
-    if intent == "FOLLOWUP_FROM_MESSAGE":
-        run_open("/System/Applications/Messages.app")
-        run_open("/System/Applications/Calendar.app")
-        return {"log": "messages + calendar · opened", "entityId": f"followup_{uid()}",
-                "response": "Opened Messages and Calendar"}
-
-    if intent == "WEB_SEARCH":
-        q = urllib.parse.quote_plus(p.get("query", "search"))
-        run_open(f"https://www.google.com/search?q={q}")
-        return {"log": f"web_search · '{p.get('query','')}'", "entityId": f"search_{uid()}",
-                "response": f"Searching for '{p.get('query','')}'"}
-
-    if intent == "OPEN_MAPS":
-        q = urllib.parse.quote_plus(p.get("query", ""))
-        run_open(f"https://maps.apple.com/?q={q}")
-        return {"log": f"maps · '{p.get('query','')}'", "entityId": f"maps_{uid()}",
-                "response": f"Opening Apple Maps — {p.get('query','')}"}
-
-    if intent == "SEND_MESSAGE":
-        run_open("/System/Applications/Messages.app")
-        return {"log": "messages · opened", "entityId": f"msg_{uid()}", "response": "Opening Messages"}
-
-    if intent == "CREATE_EVENT":
-        run_open("/System/Applications/Calendar.app")
-        run_osascript('tell application "Calendar" to activate')
-        return {"log": "calendar · opened", "entityId": f"event_{uid()}", "response": "Opening Calendar"}
-
-    if intent == "OPEN_APP":
-        app = p.get("app", "Finder")
-        subprocess.Popen(["open", "-a", app.capitalize()])
-        return {"log": f"{app} · launched", "entityId": f"app_{uid()}", "response": f"Opening {app.capitalize()}"}
-
-    if intent == "GET_DATE_TIME":
-        now = run_cmd(["date"])
-        return {"log": "clock · fetched", "entityId": f"time_{uid()}", "response": f"It is {now}"}
-
-    if intent == "CALCULATE":
-        # Safe eval for demo purposes
-        expr = p.get("expression", "")
-        # Replace common words with operators
-        expr = expr.lower().replace("plus", "+").replace("minus", "-").replace("times", "*").replace("divided by", "/").replace("over", "/")
-        # Very basic sanitization
-        clean_expr = re.sub(r'[^\d+\-*/().]', '', expr)
-        try:
-            # pylint: disable=eval-used
-            res = eval(clean_expr, {"__builtins__": None}, {})
-            return {"log": "calc · computed", "entityId": f"calc_{uid()}", "response": f"The answer is {res}"}
-        except:
-             return {"log": "calc · error", "entityId": f"err_{uid()}", "response": "I couldn't calculate that"}
-
-    if intent == "TELL_JOKE":
-        jokes = [
-            "Why do programmers prefer dark mode? Because light attracts bugs.",
-            "I ordered a chicken and an egg from Amazon. I'll let you know.",
-            "What is a cloud's favourite number? Seven. Because seven ate nine, and it was overcast.",
-            "I told my wife she was drawing her eyebrows too high. She looked surprised."
-        ]
-        joke = random.choice(jokes)
-        return {"log": "joke · told", "entityId": f"joke_{uid()}", "response": joke}
-
-    if intent == "GET_QUOTE":
-        quotes = [
-            "The only way to do great work is to love what you do. — Steve Jobs",
-            "Code is like humor. When you have to explain it, it’s bad. — Cory House",
-            "Simplicity is the soul of efficiency. — Austin Freeman",
-            "Talk is cheap. Show me the code. — Linus Torvalds"
-        ]
-        quote = random.choice(quotes)
-        return {"log": "quote · fetched", "entityId": f"quote_{uid()}", "response": quote}
-
-    if intent == "FLIP_COIN":
-        res = random.choice(["Heads", "Tails"])
-        return {"log": "coin · flipped", "entityId": f"coin_{uid()}", "response": res}
-
-    if intent == "ROLL_DIE":
-        res = str(random.randint(1, 6))
-        return {"log": "die · rolled", "entityId": f"die_{uid()}", "response": res}
-
-    if intent == "DEFINE_WORD":
-        w = p.get("word", "unknown")
-        # Mock definition
-        return {"log": "dictionary · defined", "entityId": f"def_{uid()}", "response": f"Definition of {w}: A word used in this demo."}
-
-    if intent == "CONVERT_CURRENCY":
-        # Mock conversion
-        return {"log": "currency · converted", "entityId": f"curr_{uid()}", "response": "1 USD is approximately 0.94 EUR"}
-
-    if intent == "GET_IP":
-        # Try to get local IP
-        try:
-            # This works on macOS/Linux usually
-            ip = run_cmd(["ifconfig"])
-            # Extract first non-loopback IP for demo (very rough regex)
-            m = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', ip)
-            my_ip = m.group(1) if m else "127.0.0.1"
-            if my_ip == "127.0.0.1":
-                # Try another way
-                my_ip = subprocess.getoutput("hostname -I").split()[0]
-        except:
-            my_ip = "Unknown"
-        return {"log": "ip · fetched", "entityId": f"ip_{uid()}", "response": f"Your IP address is {my_ip}"}
-
-    if intent == "GET_UPTIME":
-        up = run_cmd(["uptime"])
-        # Format: 10:00  up 1 day, 20 mins, 2 users, load averages: ...
-        return {"log": "uptime · fetched", "entityId": f"uptime_{uid()}", "response": f"System status: {up.split(',')[0]}"}
-
-    return {"log": "no-op", "entityId": "none", "response": "I couldn't handle that command"}
+    handler = INTENT_HANDLERS.get(intent, handle_default)
+    return handler(p)
 
 
 # ── Multi-Command Splitter ────────────────────────────────────────────
