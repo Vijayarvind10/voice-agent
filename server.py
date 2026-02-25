@@ -3,7 +3,13 @@ Real Time Voice MCP — Backend Server
 FastAPI + WebSocket with 13 MCP servers, TTS, multi-command chaining, conversational memory.
 """
 
-import asyncio, json, subprocess, re, random, string, urllib.parse, os, platform
+import asyncio
+import subprocess
+import re
+import random
+import string
+import urllib.parse
+import os
 from datetime import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -108,17 +114,27 @@ def escape_osascript(s: str) -> str:
     """Escape user input for safe embedding in AppleScript strings."""
     return s.replace('\\', '\\\\').replace('"', '\\"').replace("'", "\\'")
 
-def run_osascript(script: str) -> str:
+async def run_osascript(script: str) -> str:
     try:
-        r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=10)
-        return r.stdout.strip() or r.stderr.strip() or "ok"
+        proc = await asyncio.create_subprocess_exec(
+            "osascript", "-e", script,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
+        return stdout.decode().strip() or stderr.decode().strip() or "ok"
     except Exception as e:
         return str(e)
 
-def run_cmd(args: list, timeout=5) -> str:
+async def run_cmd(args: list, timeout=5) -> str:
     try:
-        r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
-        return r.stdout.strip() or r.stderr.strip() or "ok"
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        return stdout.decode().strip() or stderr.decode().strip() or "ok"
     except Exception as e:
         return str(e)
 
@@ -390,7 +406,7 @@ def route_check(plan, network_mode):
 
 
 # ── Real Execution ────────────────────────────────────────────────────
-def execute(plan: dict) -> dict:
+async def execute(plan: dict) -> dict:
     intent = plan["intent"]
     p = plan["params"]
 
@@ -415,7 +431,7 @@ def execute(plan: dict) -> dict:
     if intent == "SET_TIMER":
         secs = p.get("seconds", 600)
         dur = p.get("duration", "10 minutes")
-        run_osascript(f'display notification "Timer set for {dur}" with title "Voice MCP" sound name "Tink"')
+        await run_osascript(f'display notification "Timer set for {dur}" with title "Voice MCP" sound name "Tink"')
         subprocess.Popen(["bash", "-c",
             f'sleep {secs} && osascript -e \'display notification "⏱ Timer done!" with title "Voice MCP" sound name "Glass"\''])
         return {"log": f"timer · armed for {dur}", "entityId": f"timer_{uid()}",
@@ -431,8 +447,8 @@ def execute(plan: dict) -> dict:
         loc = p.get("location", "")
         loc_param = urllib.parse.quote_plus(loc) if loc else ""
         try:
-            r = subprocess.run(["curl", "-s", f"https://wttr.in/{loc_param}?format=3"], capture_output=True, text=True, timeout=5)
-            weather = r.stdout.strip() or "Weather data unavailable"
+            weather = await run_cmd(["curl", "-s", f"https://wttr.in/{loc_param}?format=3"])
+            if not weather or weather == "ok": weather = "Weather data unavailable"
         except:
             weather = "Could not fetch weather"
         return {"log": f"weather · {loc or 'local'}", "entityId": f"weather_{uid()}",
@@ -441,25 +457,25 @@ def execute(plan: dict) -> dict:
     if intent == "TAKE_SCREENSHOT":
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         path = os.path.expanduser(f"~/Desktop/screenshot_{ts}.png")
-        run_cmd(["screencapture", "-x", path])
+        await run_cmd(["screencapture", "-x", path])
         return {"log": f"screenshot · {path}", "entityId": f"ss_{uid()}",
-                "response": f"Screenshot saved to Desktop"}
+                "response": "Screenshot saved to Desktop"}
 
     if intent == "CLIPBOARD":
-        content = run_cmd(["pbpaste"])
+        content = await run_cmd(["pbpaste"])
         preview = content[:100] + ("..." if len(content) > 100 else "")
         return {"log": "clipboard · read", "entityId": f"clip_{uid()}",
                 "response": f"Clipboard: {preview}" if content else "Clipboard is empty"}
 
     if intent == "SYSTEM_INFO":
-        battery = run_cmd(["pmset", "-g", "batt"])
+        battery = await run_cmd(["pmset", "-g", "batt"])
         bat_match = re.search(r'(\d+)%', battery)
         bat_pct = bat_match.group(1) + "%" if bat_match else "N/A"
-        mem = run_cmd(["sysctl", "-n", "hw.memsize"])
+        mem = await run_cmd(["sysctl", "-n", "hw.memsize"])
         try: mem_gb = f"{int(mem) / (1024**3):.0f}GB"
         except: mem_gb = "N/A"
-        cpu = run_cmd(["sysctl", "-n", "machdep.cpu.brand_string"])
-        disk = run_cmd(["df", "-h", "/"])
+        cpu = await run_cmd(["sysctl", "-n", "machdep.cpu.brand_string"])
+        disk = await run_cmd(["df", "-h", "/"])
         disk_match = re.search(r'(\d+)%', disk)
         disk_used = disk_match.group(0) if disk_match else "N/A"
         return {"log": "sysinfo · fetched", "entityId": f"sys_{uid()}",
@@ -467,21 +483,21 @@ def execute(plan: dict) -> dict:
 
     if intent == "VOLUME_CONTROL":
         if p.get("mute"):
-            run_osascript('set volume with output muted')
+            await run_osascript('set volume with output muted')
             return {"log": "volume · muted", "entityId": f"vol_{uid()}", "response": "Volume muted"}
         if p.get("unmute"):
-            run_osascript('set volume without output muted')
+            await run_osascript('set volume without output muted')
             return {"log": "volume · unmuted", "entityId": f"vol_{uid()}", "response": "Volume unmuted"}
         level = p.get("level")
         if level is not None:
             apple_vol = max(0, min(100, level)) / 100 * 7
-            run_osascript(f'set volume output volume {level}')
+            await run_osascript(f'set volume output volume {level}')
             return {"log": f"volume · set to {level}%", "entityId": f"vol_{uid()}", "response": f"Volume set to {level}%"}
         return {"log": "volume · no action", "entityId": f"vol_{uid()}", "response": "Say 'set volume to 50' or 'mute'"}
 
     if intent == "CREATE_NOTE":
         body = escape_osascript(p.get("body", "Note from Voice MCP"))
-        run_osascript(f'''
+        await run_osascript(f'''
             tell application "Notes"
                 activate
                 tell account "iCloud"
@@ -489,12 +505,12 @@ def execute(plan: dict) -> dict:
                 end tell
             end tell
         ''')
-        return {"log": f"notes · created", "entityId": f"note_{uid()}",
+        return {"log": "notes · created", "entityId": f"note_{uid()}",
                 "response": f"Note created: {body[:60]}"}
 
     if intent == "CREATE_REMINDER":
         body = escape_osascript(p.get("body", "Reminder"))
-        run_osascript(f'''
+        await run_osascript(f'''
             tell application "Reminders"
                 activate
                 tell list "Reminders"
@@ -502,7 +518,7 @@ def execute(plan: dict) -> dict:
                 end tell
             end tell
         ''')
-        return {"log": f"reminders · added", "entityId": f"rem_{uid()}",
+        return {"log": "reminders · added", "entityId": f"rem_{uid()}",
                 "response": f"Reminder added: {body[:60]}"}
 
     if intent == "OPEN_FINDER":
@@ -537,7 +553,7 @@ def execute(plan: dict) -> dict:
 
     if intent == "CREATE_EVENT":
         run_open("/System/Applications/Calendar.app")
-        run_osascript('tell application "Calendar" to activate')
+        await run_osascript('tell application "Calendar" to activate')
         return {"log": "calendar · opened", "entityId": f"event_{uid()}", "response": "Opening Calendar"}
 
     if intent == "OPEN_APP":
@@ -546,7 +562,7 @@ def execute(plan: dict) -> dict:
         return {"log": f"{app} · launched", "entityId": f"app_{uid()}", "response": f"Opening {app.capitalize()}"}
 
     if intent == "GET_DATE_TIME":
-        now = run_cmd(["date"])
+        now = await run_cmd(["date"])
         return {"log": "clock · fetched", "entityId": f"time_{uid()}", "response": f"It is {now}"}
 
     if intent == "CALCULATE":
@@ -604,7 +620,7 @@ def execute(plan: dict) -> dict:
         # Try to get local IP
         try:
             # This works on macOS/Linux usually
-            ip = run_cmd(["ifconfig"])
+            ip = await run_cmd(["ifconfig"])
             # Extract first non-loopback IP for demo (very rough regex)
             m = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', ip)
             my_ip = m.group(1) if m else "127.0.0.1"
@@ -616,7 +632,7 @@ def execute(plan: dict) -> dict:
         return {"log": "ip · fetched", "entityId": f"ip_{uid()}", "response": f"Your IP address is {my_ip}"}
 
     if intent == "GET_UPTIME":
-        up = run_cmd(["uptime"])
+        up = await run_cmd(["uptime"])
         # Format: 10:00  up 1 day, 20 mins, 2 users, load averages: ...
         return {"log": "uptime · fetched", "entityId": f"uptime_{uid()}", "response": f"System status: {up.split(',')[0]}"}
 
@@ -729,7 +745,7 @@ async def websocket_endpoint(ws: WebSocket):
 
                 # Stage 7: EXECUTION
                 try:
-                    result = execute(plan)
+                    result = await execute(plan)
                 except Exception as ex:
                     result = {"log": f"error · {str(ex)[:80]}", "entityId": f"err_{uid()}",
                               "response": f"Execution failed: {str(ex)[:100]}"}
@@ -790,9 +806,9 @@ app.mount("/static", StaticFiles(directory="."), name="static")
 if __name__ == "__main__":
     print("\n  🎙  Real Time Voice MCP — Backend Server")
     print("  ─────────────────────────────────────────")
-    print(f"  → http://localhost:8000")
-    print(f"  → WebSocket: ws://localhost:8000/ws")
+    print("  → http://localhost:8000")
+    print("  → WebSocket: ws://localhost:8000/ws")
     print(f"  → {len(SERVERS)} MCP servers registered")
-    print(f"  → TTS enabled (macOS Samantha voice)")
+    print("  → TTS enabled (macOS Samantha voice)")
     print("  → Press Ctrl+C to stop\n")
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
