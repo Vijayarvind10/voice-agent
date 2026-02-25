@@ -5,7 +5,9 @@ FastAPI + WebSocket with 13 MCP servers, TTS, multi-command chaining, conversati
 
 import asyncio, json, subprocess, re, random, string, urllib.parse, os, platform
 from datetime import datetime
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import secrets
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Security, Depends, HTTPException, status, Query
+from fastapi.security import APIKeyHeader, APIKeyQuery
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -27,6 +29,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Authentication ────────────────────────────────────────────────────
+API_KEY = os.getenv("MCP_API_KEY")
+if not API_KEY:
+    API_KEY = secrets.token_urlsafe(32)
+    print(f"\n🔑 Generated API Key: {API_KEY}\n")
+
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+api_key_query = APIKeyQuery(name="token", auto_error=False)
+
+async def get_api_key(
+    api_key_header: str = Security(api_key_header),
+    api_key_query: str = Security(api_key_query),
+):
+    if api_key_header and secrets.compare_digest(api_key_header, API_KEY):
+        return api_key_header
+    if api_key_query and secrets.compare_digest(api_key_query, API_KEY):
+        return api_key_query
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or missing API Key",
+    )
 
 # ── Regex Patterns ────────────────────────────────────────────────────
 RE_TIMER_DURATION = re.compile(r'(\d+)\s*(minute|min|second|sec|hour|hr)')
@@ -648,7 +672,10 @@ def split_commands(text: str) -> list:
 
 # ── WebSocket Pipeline ────────────────────────────────────────────────
 @app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
+async def websocket_endpoint(ws: WebSocket, token: str = Query(None)):
+    if not token or not secrets.compare_digest(token, API_KEY):
+        await ws.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
     await ws.accept()
     # Send server list on connect
     await ws.send_json({"type": "servers", "servers": SERVERS})
@@ -785,15 +812,15 @@ async def websocket_endpoint(ws: WebSocket):
 
 
 # ── REST ──────────────────────────────────────────────────────────────
-@app.get("/health")
+@app.get("/health", dependencies=[Depends(get_api_key)])
 def health():
     return {"status": "ok", "servers": len(SERVERS), "history": len(conversation_history)}
 
-@app.get("/servers")
+@app.get("/servers", dependencies=[Depends(get_api_key)])
 def get_servers():
     return SERVERS
 
-@app.get("/history")
+@app.get("/history", dependencies=[Depends(get_api_key)])
 def get_history():
     return conversation_history[-10:]
 
