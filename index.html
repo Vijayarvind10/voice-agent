@@ -2102,7 +2102,7 @@
             dom.micBtn.classList.add('listening');
             dom.micLabel.textContent = 'Listening...';
             // Start visualizer only after recognition has successfully started (avoids mic conflict)
-            startAudioVis();
+            // startAudioVis();
           };
           recognition.onerror = (e) => {
             micListening = false;
