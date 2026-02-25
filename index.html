@@ -2032,9 +2032,16 @@
           dom.micLabel.textContent = 'Listening...';
           dom.input.value = '';
           dom.input.classList.add('interim');
-          startAudioVis();
+          // startAudioVis() moved to recognition.onstart to prevent mic conflict
           if (recognition) recognition._bargeInSent = false;
-          recognition.start();
+          try {
+            recognition.start();
+          } catch (e) {
+            console.error("SpeechRecognition start failed:", e);
+            micListening = false;
+            dom.micBtn.classList.remove('listening');
+            dom.micLabel.textContent = 'Error starting mic';
+          }
         });
 
         if (recognition) {
@@ -2089,6 +2096,13 @@
               setTimeout(() => { dom.micBtn.classList.remove('processing'); dom.micLabel.textContent = 'Tap to speak'; }, 600);
               runPipeline(val);
             }
+          };
+          recognition.onstart = () => {
+            micListening = true;
+            dom.micBtn.classList.add('listening');
+            dom.micLabel.textContent = 'Listening...';
+            // Start visualizer only after recognition has successfully started (avoids mic conflict)
+            startAudioVis();
           };
           recognition.onerror = (e) => {
             micListening = false;
