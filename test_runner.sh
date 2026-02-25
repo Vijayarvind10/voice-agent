@@ -224,6 +224,21 @@ run_tests() {
     warn "Found $SCRIPT_TAGS script tags — verify no unexpected injections"
   fi
 
+  # ─── 11. Bug 11 regression: Mic conflict fix ───
+  log "Bug 11 — Mic conflict prevention"
+
+  if echo "$CONTENT" | grep -q "recognition.onstart ="; then
+    pass "recognition.onstart handler is defined"
+  else
+    fail "Bug 11 REGRESSION: recognition.onstart handler missing"
+  fi
+
+  if echo "$CONTENT" | grep -q "// startAudioVis() moved to recognition.onstart"; then
+     pass "startAudioVis() call in click handler is commented/moved"
+  else
+     fail "Bug 11 REGRESSION: startAudioVis() might still be in click handler directly"
+  fi
+
   # ─── Summary ───
   TOTAL=$((PASS+FAIL))
   header "Results: $PASS/$TOTAL passed, $FAIL failed"
