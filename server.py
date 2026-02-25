@@ -390,7 +390,7 @@ def route_check(plan, network_mode):
 
 
 # ── Real Execution ────────────────────────────────────────────────────
-def execute(plan: dict) -> dict:
+async def execute(plan: dict) -> dict:
     intent = plan["intent"]
     p = plan["params"]
 
@@ -431,8 +431,19 @@ def execute(plan: dict) -> dict:
         loc = p.get("location", "")
         loc_param = urllib.parse.quote_plus(loc) if loc else ""
         try:
-            r = subprocess.run(["curl", "-s", f"https://wttr.in/{loc_param}?format=3"], capture_output=True, text=True, timeout=5)
-            weather = r.stdout.strip() or "Weather data unavailable"
+            proc = await asyncio.create_subprocess_exec(
+                "curl", "-s", f"https://wttr.in/{loc_param}?format=3",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=5)
+                weather = stdout.decode().strip() or "Weather data unavailable"
+            except asyncio.TimeoutError:
+                if proc.returncode is None:
+                    proc.kill()
+                    await proc.wait()
+                weather = "Weather data unavailable"
         except:
             weather = "Could not fetch weather"
         return {"log": f"weather · {loc or 'local'}", "entityId": f"weather_{uid()}",
@@ -729,7 +740,7 @@ async def websocket_endpoint(ws: WebSocket):
 
                 # Stage 7: EXECUTION
                 try:
-                    result = execute(plan)
+                    result = await execute(plan)
                 except Exception as ex:
                     result = {"log": f"error · {str(ex)[:80]}", "entityId": f"err_{uid()}",
                               "response": f"Execution failed: {str(ex)[:100]}"}
