@@ -47,6 +47,10 @@ def normalise(s: str) -> str:
     c = re.sub(r'\s+', ' ', s.strip())
     return c[0].lower() + c[1:] if c else ""
 
+def escape_osascript(s: str) -> str:
+    """Escape user input for safe embedding in AppleScript strings."""
+    return s.replace('\\', '\\\\').replace('"', '\\"').replace("'", "\\'")
+
 def run_osascript(script: str) -> str:
     try:
         r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=10)
@@ -314,7 +318,7 @@ def execute(plan):
         return {"log": "volume · no action", "entityId": f"vol_{uid()}", "response": "Say 'set volume to 50' or 'mute'"}
 
     if intent == "CREATE_NOTE":
-        body = p.get("body", "Note from Voice MCP")
+        body = escape_osascript(p.get("body", "Note from Voice MCP"))
         run_osascript(f'''
             tell application "Notes"
                 activate
@@ -327,7 +331,7 @@ def execute(plan):
                 "response": f"Note created: {body[:60]}"}
 
     if intent == "CREATE_REMINDER":
-        body = p.get("body", "Reminder")
+        body = escape_osascript(p.get("body", "Reminder"))
         run_osascript(f'''
             tell application "Reminders"
                 activate
@@ -475,7 +479,11 @@ async def websocket_pipeline(ws: WebSocket):
                 await asyncio.sleep(0.04)
 
                 # Stage 7: EXECUTION
-                result = execute(plan)
+                try:
+                    result = execute(plan)
+                except Exception as ex:
+                    result = {"log": f"error · {str(ex)[:80]}", "entityId": f"err_{uid()}",
+                              "response": f"Execution failed: {str(ex)[:100]}"}
                 exec_st = "pcc" if route["routeType"] == "pcc" else "ok"
                 await ws.send_json({"type": "stage", "index": 6, "id": "execution",
                                     "status": exec_st, "text": result["log"],
