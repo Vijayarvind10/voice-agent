@@ -781,6 +781,10 @@ def get_servers():
 def get_history():
     return conversation_history[-10:]
 
+@app.get("/app.js")
+def get_app_js():
+    return FileResponse("app.js")
+
 @app.get("/")
 def root():
     return FileResponse("index.html")

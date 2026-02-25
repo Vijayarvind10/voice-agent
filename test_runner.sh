@@ -8,6 +8,7 @@
 set -eu
 
 FILE="$(cd "$(dirname "$0")" && pwd)/index.html"
+JS_FILE="$(cd "$(dirname "$0")" && pwd)/app.js"
 INTERVAL=300  # seconds (5 minutes)
 PASS=0
 FAIL=0
@@ -31,6 +32,13 @@ run_tests() {
   PASS=0
   FAIL=0
   CONTENT=$(cat "$FILE")
+
+  if [ -f "$JS_FILE" ]; then
+    JS_CONTENT=$(cat "$JS_FILE")
+  else
+    fail "app.js not found at $JS_FILE"
+    return
+  fi
 
   header "Run #$RUN — $(date '+%Y-%m-%d %H:%M:%S')"
 
@@ -65,19 +73,19 @@ run_tests() {
   # ─── 2. Bug 1 regression: SVG class handling ───
   log "Bug 1 — SVG class handling"
 
-  if echo "$CONTENT" | grep -q "className.baseVal"; then
+  if echo "$JS_CONTENT" | grep -q "className.baseVal"; then
     fail "Bug 1 REGRESSION: className.baseVal still present (should use setAttribute)"
   else
     pass "No className.baseVal usage — setAttribute used instead"
   fi
 
-  if echo "$CONTENT" | grep -q "setAttribute('class', 'conn-line')"; then
+  if echo "$JS_CONTENT" | grep -q "setAttribute('class', 'conn-line')"; then
     pass "conn-line reset uses setAttribute"
   else
     fail "conn-line reset not using setAttribute"
   fi
 
-  if echo "$CONTENT" | grep -q "setAttribute('class', 'conn-arrow')"; then
+  if echo "$JS_CONTENT" | grep -q "setAttribute('class', 'conn-arrow')"; then
     pass "conn-arrow reset uses setAttribute"
   else
     fail "conn-arrow reset not using setAttribute"
@@ -86,13 +94,13 @@ run_tests() {
   # ─── 3. Bug 2 regression: Session expiry & live dot ───
   log "Bug 2 — Session expiry logic"
 
-  if echo "$CONTENT" | grep -q "if (session.active) dom.liveDot.classList.remove"; then
+  if echo "$JS_CONTENT" | grep -q "if (session.active) dom.liveDot.classList.remove"; then
     pass "done() conditionally sets live dot based on session.active"
   else
     fail "Bug 2 REGRESSION: done() unconditionally removes 'off' from liveDot"
   fi
 
-  if echo "$CONTENT" | grep -q "if (!session.active) session.id = uid()"; then
+  if echo "$JS_CONTENT" | grep -q "if (!session.active) session.id = uid()"; then
     pass "Session ID regenerated on expired session"
   else
     fail "Bug 2 REGRESSION: Session ID not regenerated on expiry"
@@ -101,9 +109,9 @@ run_tests() {
   # ─── 4. Bug 3 regression: Pipeline cancellation ───
   log "Bug 3 — Pipeline cancellation"
 
-  if echo "$CONTENT" | grep -q "if (running)"; then
+  if echo "$JS_CONTENT" | grep -q "if (running)"; then
     # Check it's NOT just 'if (running) return;'
-    if echo "$CONTENT" | grep -q "if (running) return;"; then
+    if echo "$JS_CONTENT" | grep -q "if (running) return;"; then
       fail "Bug 3 REGRESSION: Pipeline still blocks new commands with 'if (running) return'"
     else
       pass "Pipeline allows cancellation of in-flight runs"
@@ -115,7 +123,7 @@ run_tests() {
   # ─── 5. Bug 4 regression: normalise() casing ───
   log "Bug 4 — Transcript normalisation"
 
-  if echo "$CONTENT" | grep -q 'c\[0\]\.toLowerCase()'; then
+  if echo "$JS_CONTENT" | grep -q 'c\[0\]\.toLowerCase()'; then
     fail "Bug 4 REGRESSION: normalise() still lowercases first character"
   else
     pass "normalise() preserves original casing"
@@ -124,13 +132,13 @@ run_tests() {
   # ─── 6. Bug 7 regression: XSS single-quote escape ───
   log "Bug 7 — XSS protection"
 
-  if echo "$CONTENT" | grep -q "&#39;"; then
+  if echo "$JS_CONTENT" | grep -q "&#39;"; then
     pass "esc() escapes single quotes (&#39;)"
   else
     fail "Bug 7 REGRESSION: esc() does not escape single quotes"
   fi
 
-  if echo "$CONTENT" | grep -q '&amp;' && echo "$CONTENT" | grep -q '&lt;' && echo "$CONTENT" | grep -q '&gt;' && echo "$CONTENT" | grep -q '&quot;'; then
+  if echo "$JS_CONTENT" | grep -q '&amp;' && echo "$JS_CONTENT" | grep -q '&lt;' && echo "$JS_CONTENT" | grep -q '&gt;' && echo "$JS_CONTENT" | grep -q '&quot;'; then
     pass "esc() handles all standard HTML entities"
   else
     fail "esc() missing standard HTML entity escapes"
@@ -139,19 +147,19 @@ run_tests() {
   # ─── 7. Bug 8 regression: AudioContext leak guard ───
   log "Bug 8 — AudioContext leak prevention"
 
-  if echo "$CONTENT" | grep -q "pendingMicPromise"; then
+  if echo "$JS_CONTENT" | grep -q "pendingMicPromise"; then
     pass "Mic promise tracking variable exists"
   else
     fail "Bug 8 REGRESSION: No pendingMicPromise guard"
   fi
 
-  if echo "$CONTENT" | grep -q "pendingMicPromise !== micPromiseId"; then
+  if echo "$JS_CONTENT" | grep -q "pendingMicPromise !== micPromiseId"; then
     pass "getUserMedia promise cancellation check present"
   else
     fail "Bug 8 REGRESSION: No promise cancellation check"
   fi
 
-  if echo "$CONTENT" | grep -q "pendingMicPromise = null"; then
+  if echo "$JS_CONTENT" | grep -q "pendingMicPromise = null"; then
     pass "stopAudioVis invalidates pending promise"
   else
     fail "Bug 8 REGRESSION: stopAudioVis doesn't invalidate promise"
@@ -160,8 +168,8 @@ run_tests() {
   # ─── 8. Bug 9 regression: aria-checked sync ───
   log "Bug 9 — aria-checked sync on presets"
 
-  ARIA_PRIVACY=$(echo "$CONTENT" | grep -c "privacyToggle.setAttribute('aria-checked'" || true)
-  ARIA_NETWORK=$(echo "$CONTENT" | grep -c "networkToggle.setAttribute('aria-checked'" || true)
+  ARIA_PRIVACY=$(echo "$JS_CONTENT" | grep -c "privacyToggle.setAttribute('aria-checked'" || true)
+  ARIA_NETWORK=$(echo "$JS_CONTENT" | grep -c "networkToggle.setAttribute('aria-checked'" || true)
 
   if [ "$ARIA_PRIVACY" -ge 2 ]; then
     pass "Privacy toggle aria-checked set in both click handler and preset handler"
@@ -184,7 +192,7 @@ run_tests() {
     fail "Bug 10 REGRESSION: Visualizer canvas still uses hardcoded px sizing"
   fi
 
-  if echo "$CONTENT" | grep -q "dom.micVis.width"; then
+  if echo "$JS_CONTENT" | grep -q "dom.micVis.width"; then
     pass "drawVis() reads canvas dimensions dynamically"
   else
     fail "Bug 10 REGRESSION: drawVis() uses hardcoded dimensions"
@@ -227,13 +235,13 @@ run_tests() {
   # ─── 11. Bug 11 regression: Mic conflict fix ───
   log "Bug 11 — Mic conflict prevention"
 
-  if echo "$CONTENT" | grep -q "recognition.onstart ="; then
+  if echo "$JS_CONTENT" | grep -q "recognition.onstart ="; then
     pass "recognition.onstart handler is defined"
   else
     fail "Bug 11 REGRESSION: recognition.onstart handler missing"
   fi
 
-  if echo "$CONTENT" | grep -q "// startAudioVis() moved to recognition.onstart"; then
+  if echo "$JS_CONTENT" | grep -q "// startAudioVis() moved to recognition.onstart"; then
      pass "startAudioVis() call in click handler is commented/moved"
   else
      fail "Bug 11 REGRESSION: startAudioVis() might still be in click handler directly"
