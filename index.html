@@ -2204,6 +2204,19 @@
         }
         connectWS();
 
+        /* ── Simulation Config ─── */
+        let SIMULATION_CONFIG = {};
+        function loadSimulationConfig() {
+          fetch('/simulation/config')
+            .then(r => r.json())
+            .then(data => {
+              SIMULATION_CONFIG = data;
+              console.log("Simulation config loaded", Object.keys(data).length);
+            })
+            .catch(e => console.warn("Using fallback simulation logic (offline/error)", e));
+        }
+        loadSimulationConfig();
+
         let wsResolve = null;
         function handleWSMessage(msg) {
           if (msg.type === 'servers') {
@@ -2572,38 +2585,33 @@
           return { ok: true, routeType: plan.routeType, label: plan.routeType.toUpperCase() + ' route', servers: plan.servers };
         }
         function execute(plan) {
-          switch (plan.intent) {
-            case 'MISSING_SLOT': return { log: 'dialogue · clarifying', entityId: 'dlg_' + uid(), response: plan.params ? plan.params.message : 'Can you clarify?' };
-            case 'SET_TIMER': return { log: 'timer · armed for duration', entityId: 'timer_' + uid(), response: 'Timer set' };
-            case 'PLAY_MUSIC': return { log: 'youtube_music · playback started', entityId: 'music_' + uid(), response: 'Playing on YouTube Music' };
-            case 'GET_WEATHER': return { log: 'weather · fetched', entityId: 'weather_' + uid(), response: 'Weather data retrieved' };
-            case 'TAKE_SCREENSHOT': return { log: 'screenshot · saved', entityId: 'ss_' + uid(), response: 'Screenshot saved to Desktop' };
-            case 'CLIPBOARD': return { log: 'clipboard · read', entityId: 'clip_' + uid(), response: 'Clipboard contents retrieved' };
-            case 'SYSTEM_INFO': return { log: 'sysinfo · fetched', entityId: 'sys_' + uid(), response: 'System info retrieved' };
-            case 'VOLUME_CONTROL': return { log: 'volume · adjusted', entityId: 'vol_' + uid(), response: 'Volume adjusted' };
-            case 'CREATE_NOTE': return { log: 'notes · created', entityId: 'note_' + uid(), response: 'Note created in Apple Notes' };
-            case 'CREATE_REMINDER': return { log: 'reminders · added', entityId: 'rem_' + uid(), response: 'Reminder added to Reminders' };
-            case 'OPEN_FINDER': return { log: 'finder · opened', entityId: 'finder_' + uid(), response: 'Opened folder in Finder' };
-            case 'FOLLOWUP_FROM_MESSAGE': return { log: 'messages + calendar · opened', entityId: 'followup_' + uid(), response: 'Opened Messages and Calendar' };
-            case 'WEB_SEARCH': return { log: 'web_search · completed', entityId: 'search_' + uid(), response: 'Search results opened' };
-            case 'OPEN_MAPS': return { log: 'maps · opened', entityId: 'maps_' + uid(), response: 'Opening Apple Maps' };
-            case 'SEND_MESSAGE': return { log: 'messages · opened', entityId: 'msg_' + uid(), response: 'Opening Messages' };
-            case 'CREATE_EVENT': return { log: 'calendar · opened', entityId: 'event_' + uid(), response: 'Opening Calendar' };
-            case 'OPEN_APP': return { log: 'app · launched', entityId: 'app_' + uid(), response: 'Opening app' };
-            case 'REPEAT_LAST': return { log: 'replay · last command', entityId: 'replay_' + uid(), response: 'Repeating last command' };
-            case 'RECALL_HISTORY': return { log: 'history · recalled', entityId: 'hist_' + uid(), response: 'Showing recent history' };
-            case 'GET_DATE_TIME': return { log: 'clock · fetched', entityId: 'time_' + uid(), response: 'It is ' + new Date().toLocaleString() };
-            case 'CALCULATE': return { log: 'calc · computed', entityId: 'calc_' + uid(), response: 'The answer is 42 (simulated)' };
-            case 'TELL_JOKE': return { log: 'joke · told', entityId: 'joke_' + uid(), response: 'Why did the chicken cross the road? To get to the other side.' };
-            case 'GET_QUOTE': return { log: 'quote · fetched', entityId: 'quote_' + uid(), response: 'The only way to do great work is to love what you do.' };
-            case 'FLIP_COIN': return { log: 'coin · flipped', entityId: 'coin_' + uid(), response: Math.random() > 0.5 ? 'Heads' : 'Tails' };
-            case 'ROLL_DIE': return { log: 'die · rolled', entityId: 'die_' + uid(), response: '' + Math.floor(Math.random() * 6 + 1) };
-            case 'DEFINE_WORD': return { log: 'dictionary · defined', entityId: 'def_' + uid(), response: 'Definition of ' + (plan.params.word || 'word') + ': A word used in this demo.' };
-            case 'CONVERT_CURRENCY': return { log: 'currency · converted', entityId: 'curr_' + uid(), response: '1 USD is approximately 0.94 EUR' };
-            case 'GET_IP': return { log: 'ip · fetched', entityId: 'ip_' + uid(), response: 'Your IP address is 127.0.0.1 (simulated)' };
-            case 'GET_UPTIME': return { log: 'uptime · fetched', entityId: 'uptime_' + uid(), response: 'System status: up 1 day, 2:30' };
-            default: return { log: 'no-op', entityId: session.lastEntity, response: 'I could not complete that command' };
+          const config = SIMULATION_CONFIG[plan.intent];
+          if (config) {
+            let response = config.default_response || config.response || "";
+
+            if (config.response_options) {
+              response = config.response_options[Math.floor(Math.random() * config.response_options.length)];
+            }
+
+            if (config.response_param && plan.params && plan.params[config.response_param]) {
+              response = plan.params[config.response_param];
+            }
+
+            // Template substitution
+            if (response && response.includes('{')) {
+              response = response.replace(/{(\w+)}/g, (_, key) => {
+                if (key === 'current_time') return new Date().toLocaleString();
+                return (plan.params && plan.params[key]) || key;
+              });
+            }
+
+            return {
+              log: config.log,
+              entityId: config.entityPrefix + uid(),
+              response: response
+            };
           }
+          return { log: 'no-op', entityId: session.lastEntity, response: 'I could not complete that command (simulation config missing)' };
         }
 
         /* ── UI helpers ─── */

@@ -93,6 +93,157 @@ SERVERS = [
 conversation_history = []  # [{turn, command, intent, response, timestamp}]
 MAX_HISTORY = 20
 
+# ── Simulation Configuration ──────────────────────────────────────────
+# Centralized definitions for frontend simulation logic to prevent drift.
+SIMULATION_CONFIG = {
+    "MISSING_SLOT": {
+        "log": "dialogue · clarifying",
+        "entityPrefix": "dlg_",
+        "response_param": "message",
+        "default_response": "Can you clarify?"
+    },
+    "SET_TIMER": {
+        "log": "timer · armed for duration",
+        "entityPrefix": "timer_",
+        "response": "Timer set"
+    },
+    "PLAY_MUSIC": {
+        "log": "youtube_music · playback started",
+        "entityPrefix": "music_",
+        "response": "Playing on YouTube Music"
+    },
+    "GET_WEATHER": {
+        "log": "weather · fetched",
+        "entityPrefix": "weather_",
+        "response": "Weather data retrieved"
+    },
+    "TAKE_SCREENSHOT": {
+        "log": "screenshot · saved",
+        "entityPrefix": "ss_",
+        "response": "Screenshot saved to Desktop"
+    },
+    "CLIPBOARD": {
+        "log": "clipboard · read",
+        "entityPrefix": "clip_",
+        "response": "Clipboard contents retrieved"
+    },
+    "SYSTEM_INFO": {
+        "log": "sysinfo · fetched",
+        "entityPrefix": "sys_",
+        "response": "System info retrieved"
+    },
+    "VOLUME_CONTROL": {
+        "log": "volume · adjusted",
+        "entityPrefix": "vol_",
+        "response": "Volume adjusted"
+    },
+    "CREATE_NOTE": {
+        "log": "notes · created",
+        "entityPrefix": "note_",
+        "response": "Note created in Apple Notes"
+    },
+    "CREATE_REMINDER": {
+        "log": "reminders · added",
+        "entityPrefix": "rem_",
+        "response": "Reminder added to Reminders"
+    },
+    "OPEN_FINDER": {
+        "log": "finder · opened",
+        "entityPrefix": "finder_",
+        "response": "Opened folder in Finder"
+    },
+    "FOLLOWUP_FROM_MESSAGE": {
+        "log": "messages + calendar · opened",
+        "entityPrefix": "followup_",
+        "response": "Opened Messages and Calendar"
+    },
+    "WEB_SEARCH": {
+        "log": "web_search · completed",
+        "entityPrefix": "search_",
+        "response": "Search results opened"
+    },
+    "OPEN_MAPS": {
+        "log": "maps · opened",
+        "entityPrefix": "maps_",
+        "response": "Opening Apple Maps"
+    },
+    "SEND_MESSAGE": {
+        "log": "messages · opened",
+        "entityPrefix": "msg_",
+        "response": "Opening Messages"
+    },
+    "CREATE_EVENT": {
+        "log": "calendar · opened",
+        "entityPrefix": "event_",
+        "response": "Opening Calendar"
+    },
+    "OPEN_APP": {
+        "log": "app · launched",
+        "entityPrefix": "app_",
+        "response": "Opening app"
+    },
+    "REPEAT_LAST": {
+        "log": "replay · last command",
+        "entityPrefix": "replay_",
+        "response": "Repeating last command"
+    },
+    "RECALL_HISTORY": {
+        "log": "history · recalled",
+        "entityPrefix": "hist_",
+        "response": "Showing recent history"
+    },
+    "GET_DATE_TIME": {
+        "log": "clock · fetched",
+        "entityPrefix": "time_",
+        "response": "It is {current_time}"
+    },
+    "CALCULATE": {
+        "log": "calc · computed",
+        "entityPrefix": "calc_",
+        "response": "The answer is 42 (simulated)"
+    },
+    "TELL_JOKE": {
+        "log": "joke · told",
+        "entityPrefix": "joke_",
+        "response": "Why did the chicken cross the road? To get to the other side."
+    },
+    "GET_QUOTE": {
+        "log": "quote · fetched",
+        "entityPrefix": "quote_",
+        "response": "The only way to do great work is to love what you do."
+    },
+    "FLIP_COIN": {
+        "log": "coin · flipped",
+        "entityPrefix": "coin_",
+        "response_options": ["Heads", "Tails"]
+    },
+    "ROLL_DIE": {
+        "log": "die · rolled",
+        "entityPrefix": "die_",
+        "response_options": ["1", "2", "3", "4", "5", "6"]
+    },
+    "DEFINE_WORD": {
+        "log": "dictionary · defined",
+        "entityPrefix": "def_",
+        "response": "Definition of {word}: A word used in this demo."
+    },
+    "CONVERT_CURRENCY": {
+        "log": "currency · converted",
+        "entityPrefix": "curr_",
+        "response": "1 USD is approximately 0.94 EUR"
+    },
+    "GET_IP": {
+        "log": "ip · fetched",
+        "entityPrefix": "ip_",
+        "response": "Your IP address is 127.0.0.1 (simulated)"
+    },
+    "GET_UPTIME": {
+        "log": "uptime · fetched",
+        "entityPrefix": "uptime_",
+        "response": "System status: up 1 day, 2:30"
+    }
+}
+
 # ── Helpers ───────────────────────────────────────────────────────────
 def uid():
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
@@ -780,6 +931,11 @@ def get_servers():
 @app.get("/history")
 def get_history():
     return conversation_history[-10:]
+
+@app.get("/simulation/config")
+def get_simulation_config():
+    """Returns the configuration for frontend simulation."""
+    return SIMULATION_CONFIG
 
 @app.get("/")
 def root():
