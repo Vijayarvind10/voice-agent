@@ -115,10 +115,26 @@ def run_osascript(script: str) -> str:
     except Exception as e:
         return str(e)
 
-def run_cmd(args: list, timeout=5) -> str:
+async def run_cmd(args: list, timeout=5) -> str:
     try:
-        r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
-        return r.stdout.strip() or r.stderr.strip() or "ok"
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass
+            await proc.communicate()
+            return f"Command '{args}' timed out after {timeout} seconds"
+
+        out = stdout.decode().strip()
+        err = stderr.decode().strip()
+        return out or err or "ok"
     except Exception as e:
         return str(e)
 
@@ -390,7 +406,7 @@ def route_check(plan, network_mode):
 
 
 # ── Real Execution ────────────────────────────────────────────────────
-def execute(plan: dict) -> dict:
+async def execute(plan: dict) -> dict:
     intent = plan["intent"]
     p = plan["params"]
 
@@ -441,25 +457,25 @@ def execute(plan: dict) -> dict:
     if intent == "TAKE_SCREENSHOT":
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         path = os.path.expanduser(f"~/Desktop/screenshot_{ts}.png")
-        run_cmd(["screencapture", "-x", path])
+        await run_cmd(["screencapture", "-x", path])
         return {"log": f"screenshot · {path}", "entityId": f"ss_{uid()}",
                 "response": f"Screenshot saved to Desktop"}
 
     if intent == "CLIPBOARD":
-        content = run_cmd(["pbpaste"])
+        content = await run_cmd(["pbpaste"])
         preview = content[:100] + ("..." if len(content) > 100 else "")
         return {"log": "clipboard · read", "entityId": f"clip_{uid()}",
                 "response": f"Clipboard: {preview}" if content else "Clipboard is empty"}
 
     if intent == "SYSTEM_INFO":
-        battery = run_cmd(["pmset", "-g", "batt"])
+        battery = await run_cmd(["pmset", "-g", "batt"])
         bat_match = re.search(r'(\d+)%', battery)
         bat_pct = bat_match.group(1) + "%" if bat_match else "N/A"
-        mem = run_cmd(["sysctl", "-n", "hw.memsize"])
+        mem = await run_cmd(["sysctl", "-n", "hw.memsize"])
         try: mem_gb = f"{int(mem) / (1024**3):.0f}GB"
         except: mem_gb = "N/A"
-        cpu = run_cmd(["sysctl", "-n", "machdep.cpu.brand_string"])
-        disk = run_cmd(["df", "-h", "/"])
+        cpu = await run_cmd(["sysctl", "-n", "machdep.cpu.brand_string"])
+        disk = await run_cmd(["df", "-h", "/"])
         disk_match = re.search(r'(\d+)%', disk)
         disk_used = disk_match.group(0) if disk_match else "N/A"
         return {"log": "sysinfo · fetched", "entityId": f"sys_{uid()}",
@@ -546,7 +562,7 @@ def execute(plan: dict) -> dict:
         return {"log": f"{app} · launched", "entityId": f"app_{uid()}", "response": f"Opening {app.capitalize()}"}
 
     if intent == "GET_DATE_TIME":
-        now = run_cmd(["date"])
+        now = await run_cmd(["date"])
         return {"log": "clock · fetched", "entityId": f"time_{uid()}", "response": f"It is {now}"}
 
     if intent == "CALCULATE":
@@ -604,7 +620,7 @@ def execute(plan: dict) -> dict:
         # Try to get local IP
         try:
             # This works on macOS/Linux usually
-            ip = run_cmd(["ifconfig"])
+            ip = await run_cmd(["ifconfig"])
             # Extract first non-loopback IP for demo (very rough regex)
             m = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', ip)
             my_ip = m.group(1) if m else "127.0.0.1"
@@ -616,7 +632,7 @@ def execute(plan: dict) -> dict:
         return {"log": "ip · fetched", "entityId": f"ip_{uid()}", "response": f"Your IP address is {my_ip}"}
 
     if intent == "GET_UPTIME":
-        up = run_cmd(["uptime"])
+        up = await run_cmd(["uptime"])
         # Format: 10:00  up 1 day, 20 mins, 2 users, load averages: ...
         return {"log": "uptime · fetched", "entityId": f"uptime_{uid()}", "response": f"System status: {up.split(',')[0]}"}
 
@@ -729,7 +745,7 @@ async def websocket_endpoint(ws: WebSocket):
 
                 # Stage 7: EXECUTION
                 try:
-                    result = execute(plan)
+                    result = await execute(plan)
                 except Exception as ex:
                     result = {"log": f"error · {str(ex)[:80]}", "entityId": f"err_{uid()}",
                               "response": f"Execution failed: {str(ex)[:100]}"}
