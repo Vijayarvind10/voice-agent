@@ -795,4 +795,4 @@ if __name__ == "__main__":
     print(f"  → {len(SERVERS)} MCP servers registered")
     print(f"  → TTS enabled (macOS Samantha voice)")
     print("  → Press Ctrl+C to stop\n")
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")
