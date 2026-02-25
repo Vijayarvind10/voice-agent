@@ -2446,9 +2446,11 @@
         /* ── Boot sequence ─── */
         const boot = document.getElementById('bootOverlay');
         const canvas = document.getElementById('starCanvas');
-        const appShell = document.getElementById('appShell');
-        setTimeout(() => { boot.classList.add('fade-out'); canvas.classList.add('visible'); appShell.classList.add('revealed'); }, 1500);
-        setTimeout(() => boot.remove(), 2200);
+        setTimeout(() => {
+          if (boot) boot.classList.add('fade-out');
+          if (canvas) canvas.classList.add('visible');
+        }, 1500);
+        setTimeout(() => { if (boot) boot.remove(); }, 2200);
 
         /* ── Glow Effect ─── */
         function initGlow() {
@@ -2639,10 +2641,14 @@
                 updateIntentBadge(interim);
 
                 // SOA Feature: Low-Latency Predictive Execution
-                // If we match an intent with high confidence and it's not missing slots, trigger early
-                const plan = classify(normalise(interim));
-                if (plan.supported && plan.intent !== 'MISSING_SLOT' && plan.confidence >= 0.94) {
-                  recognition.stop(); // Force early completion
+                // Trigger early completion only if we have a confident intent, it's not a MISSING_SLOT, 
+                // and the user has spoken at least a few words to avoid cutting off too early.
+                const words = interim.trim().split(/\s+/).length;
+                if (words >= 2) {
+                  const plan = classify(normalise(interim));
+                  if (plan.supported && plan.intent !== 'MISSING_SLOT' && plan.confidence >= 0.94) {
+                    recognition.stop(); // Force early completion
+                  }
                 }
               }, 200);
             }
