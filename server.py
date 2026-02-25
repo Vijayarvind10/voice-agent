@@ -11,6 +11,44 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import uvicorn
 
+# ── Compiled Regex Patterns ──────────────────────────────────────────
+RE_NORMALISE = re.compile(r'\s+')
+RE_TTS_CLEAN = re.compile(r'[^\w\s.,!?\'-]')
+RE_TIMER_DURATION = re.compile(r'(\d+)\s*(minute|min|second|sec|hour|hr)')
+RE_ONLY_DIGITS = re.compile(r'^(\d+)$')
+RE_REPEAT = re.compile(r'(do that again|repeat|again|redo)')
+RE_HISTORY = re.compile(r'(what did i|last command|history|what was)')
+RE_TIMER_KW = re.compile(r'timer|countdown|alarm')
+RE_MUSIC_KW = re.compile(r'youtube|music|jazz|song|play|spotify')
+RE_MUSIC_CLEAN = re.compile(r'(play|on youtube music|on youtube|on spotify)')
+RE_WEATHER_KW = re.compile(r'weather|temperature|forecast|rain|sunny')
+RE_WEATHER_LOC = re.compile(r'(?:in|at|for)\s+(.+)')
+RE_SCREENSHOT_KW = re.compile(r'screenshot|screen\s*cap|capture\s*(the\s*)?screen|snap')
+RE_CLIPBOARD_KW = re.compile(r'clipboard|paste|what.*copied|copy that')
+RE_SYSINFO_KW = re.compile(r'battery|cpu|memory|ram|disk|system\s*info|storage')
+RE_VOLUME_KW = re.compile(r'volume|mute|unmute|louder|quieter|sound')
+RE_DIGITS = re.compile(r'(\d+)')
+RE_MUTE = re.compile(r'mute')
+RE_UNMUTE = re.compile(r'unmute')
+RE_NOTE_KW = re.compile(r'(create|make|write|add)\s*(a\s*)?note')
+RE_NOTE_CLEAN = re.compile(r'(create|make|write|add)\s*(a\s*)?note\s*(saying|that says|with)?\s*')
+RE_REMINDER_KW = re.compile(r'remind|reminder')
+RE_REMINDER_CLEAN = re.compile(r'(remind me to|set a reminder to|add a reminder to|remind me)\s*')
+RE_FINDER_KW = re.compile(r'(open|show)\s*(the\s*)?(downloads?|documents?|desktop|home|finder|folder)')
+RE_FINDER_MATCH = re.compile(r'(downloads?|documents?|desktop|home|finder)')
+RE_MESSAGE_KW = re.compile(r'message')
+RE_FOLLOWUP_KW = re.compile(r'follow-up|follow up|meeting|calendar')
+RE_SEARCH_KW = re.compile(r'search|google|look up')
+RE_SEARCH_CLEAN = re.compile(r'(search|the web|for|on google|on the internet|google|look up)')
+RE_MAPS_KW = re.compile(r'map|direction|navigate|where is')
+RE_MAPS_CLEAN = re.compile(r'(open maps? to|show me|navigate to|directions? to|where is)')
+RE_SEND_MSG_KW = re.compile(r'send.*(message|text|imessage)')
+RE_EVENT_KW = re.compile(r'(create|add|schedule|new).*(event|meeting|appointment)')
+RE_OPEN_APP = re.compile(r'open\s+(\w+)')
+RE_BATTERY_PCT = re.compile(r'(\d+)%')
+RE_DISK_PCT = re.compile(r'(\d+)%')
+RE_SPLIT_CMD = re.compile(r'\s+(?:and then|and also|and|then|also)\s+', re.IGNORECASE)
+
 app = FastAPI(title="Real Time Voice MCP")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
@@ -44,7 +82,7 @@ def wake_score(cmd: str) -> float:
     return min(0.98, 0.91 + (len(cmd) % 5) * 0.01)
 
 def normalise(s: str) -> str:
-    c = re.sub(r'\s+', ' ', s.strip())
+    c = RE_NORMALISE.sub(' ', s.strip())
     return c[0].lower() + c[1:] if c else ""
 
 def escape_osascript(s: str) -> str:
@@ -85,7 +123,7 @@ def speak(text: str):
     """TTS via macOS say command (non-blocking)."""
     global tts_process
     kill_tts() # Stop any ongoing speech before starting a new one
-    clean = re.sub(r'[^\w\s.,!?\'-]', '', text)[:200]
+    clean = RE_TTS_CLEAN.sub('', text)[:200]
     tts_process = subprocess.Popen(["say", "-v", "Samantha", clean])
 
 
@@ -97,7 +135,7 @@ def classify(text: str, session_state: dict = None) -> dict:
     # Handle awaiting slot for timer duration
     if state.get("awaiting_slot") == "timer_duration":
         # Check if the user is answering with a duration
-        m = re.search(r'(\d+)\s*(minute|min|second|sec|hour|hr)', t)
+        m = RE_TIMER_DURATION.search(t)
         if m:
             dur = f"{m.group(1)} {m.group(2)}s"
             raw = int(m.group(1))
@@ -107,7 +145,7 @@ def classify(text: str, session_state: dict = None) -> dict:
                     "routeType": "local", "servers": ["com.apple.timer.mcp"],
                     "privacyClass": "local_safe", "params": {"duration": dur, "seconds": secs}}
         # If they didn't provide a duration, but it's just a number:
-        m2 = re.search(r'^(\d+)$', t)
+        m2 = RE_ONLY_DIGITS.search(t)
         if m2:
             dur = f"{m2.group(1)} minutes"
             secs = int(m2.group(1)) * 60
@@ -118,19 +156,19 @@ def classify(text: str, session_state: dict = None) -> dict:
         pass
 
     # Memory / context
-    if re.search(r'(do that again|repeat|again|redo)', t):
+    if RE_REPEAT.search(t):
         return {"supported": True, "intent": "REPEAT_LAST", "confidence": 0.95,
                 "routeType": "local", "servers": ["com.apple.clipboard.mcp"],
                 "privacyClass": "local_safe", "params": {}}
 
-    if re.search(r'(what did i|last command|history|what was)', t):
+    if RE_HISTORY.search(t):
         return {"supported": True, "intent": "RECALL_HISTORY", "confidence": 0.93,
                 "routeType": "local", "servers": ["com.apple.clipboard.mcp"],
                 "privacyClass": "local_safe", "params": {}}
 
     # Timer
-    if re.search(r'timer|countdown|alarm', t):
-        m = re.search(r'(\d+)\s*(minute|min|second|sec|hour|hr)', t)
+    if RE_TIMER_KW.search(t):
+        m = RE_TIMER_DURATION.search(t)
         if m:
             dur = f"{m.group(1)} {m.group(2)}s"
             raw = int(m.group(1))
@@ -146,105 +184,106 @@ def classify(text: str, session_state: dict = None) -> dict:
                     "params": {"slot": "timer_duration", "message": "For how long?"}}
 
     # Music
-    if re.search(r'youtube|music|jazz|song|play|spotify', t):
-        query = re.sub(r'(play|on youtube music|on youtube|on spotify)', '', t).strip()
+    if RE_MUSIC_KW.search(t):
+        query = RE_MUSIC_CLEAN.sub('', t).strip()
         return {"supported": True, "intent": "PLAY_MUSIC", "confidence": 0.93,
                 "routeType": "remote", "servers": ["com.google.youtubemusic"],
                 "privacyClass": "remote_media", "params": {"query": query or "jazz"}}
 
     # Weather
-    if re.search(r'weather|temperature|forecast|rain|sunny', t):
-        m2 = re.search(r'(?:in|at|for)\s+(.+)', t)
+    if RE_WEATHER_KW.search(t):
+        m2 = RE_WEATHER_LOC.search(t)
         loc = m2.group(1).strip() if m2 else ""
         return {"supported": True, "intent": "GET_WEATHER", "confidence": 0.94,
                 "routeType": "remote", "servers": ["com.apple.weather.mcp"],
                 "privacyClass": "remote_data", "params": {"location": loc}}
 
     # Screenshot
-    if re.search(r'screenshot|screen\s*cap|capture\s*(the\s*)?screen|snap', t):
+    if RE_SCREENSHOT_KW.search(t):
         return {"supported": True, "intent": "TAKE_SCREENSHOT", "confidence": 0.95,
                 "routeType": "local", "servers": ["com.apple.screenshot.mcp"],
                 "privacyClass": "local_safe", "params": {}}
 
     # Clipboard
-    if re.search(r'clipboard|paste|what.*copied|copy that', t):
+    if RE_CLIPBOARD_KW.search(t):
         return {"supported": True, "intent": "CLIPBOARD", "confidence": 0.92,
                 "routeType": "local", "servers": ["com.apple.clipboard.mcp"],
                 "privacyClass": "local_safe", "params": {}}
 
     # System info
-    if re.search(r'battery|cpu|memory|ram|disk|system\s*info|storage', t):
+    if RE_SYSINFO_KW.search(t):
         return {"supported": True, "intent": "SYSTEM_INFO", "confidence": 0.94,
                 "routeType": "local", "servers": ["com.apple.systeminfo.mcp"],
                 "privacyClass": "local_safe", "params": {}}
 
     # Volume
-    if re.search(r'volume|mute|unmute|louder|quieter|sound', t):
-        m3 = re.search(r'(\d+)', t)
+    if RE_VOLUME_KW.search(t):
+        m3 = RE_DIGITS.search(t)
         level = int(m3.group(1)) if m3 else None
-        mute = bool(re.search(r'mute', t) and not re.search(r'unmute', t))
-        unmute = bool(re.search(r'unmute', t))
+        mute = bool(RE_MUTE.search(t) and not RE_UNMUTE.search(t))
+        unmute = bool(RE_UNMUTE.search(t))
         return {"supported": True, "intent": "VOLUME_CONTROL", "confidence": 0.93,
                 "routeType": "local", "servers": ["com.apple.volume.mcp"],
                 "privacyClass": "local_safe", "params": {"level": level, "mute": mute, "unmute": unmute}}
 
     # Notes
-    if re.search(r'(create|make|write|add)\s*(a\s*)?note', t):
-        body = re.sub(r'(create|make|write|add)\s*(a\s*)?note\s*(saying|that says|with)?\s*', '', t).strip()
+    if RE_NOTE_KW.search(t):
+        body = RE_NOTE_CLEAN.sub('', t).strip()
         return {"supported": True, "intent": "CREATE_NOTE", "confidence": 0.91,
                 "routeType": "local", "servers": ["com.apple.notes.mcp"],
                 "privacyClass": "local_safe", "params": {"body": body or "New note from Voice MCP"}}
 
     # Reminders
-    if re.search(r'remind|reminder', t):
-        body = re.sub(r'(remind me to|set a reminder to|add a reminder to|remind me)\s*', '', t).strip()
+    if RE_REMINDER_KW.search(t):
+        body = RE_REMINDER_CLEAN.sub('', t).strip()
         return {"supported": True, "intent": "CREATE_REMINDER", "confidence": 0.92,
                 "routeType": "local", "servers": ["com.apple.reminders.mcp"],
                 "privacyClass": "local_safe", "params": {"body": body or "Voice MCP reminder"}}
 
     # Finder
-    if re.search(r'(open|show)\s*(the\s*)?(downloads?|documents?|desktop|home|finder|folder)', t):
-        m4 = re.search(r'(downloads?|documents?|desktop|home|finder)', t)
+    if RE_FINDER_KW.search(t):
+        m4 = RE_FINDER_MATCH.search(t)
         folder = m4.group(1) if m4 else "Finder"
         return {"supported": True, "intent": "OPEN_FINDER", "confidence": 0.93,
                 "routeType": "local", "servers": ["com.apple.finder.mcp"],
                 "privacyClass": "local_safe", "params": {"folder": folder}}
 
     # Messages + Calendar (cross-context)
-    if re.search(r'message', t) and re.search(r'follow-up|follow up|meeting|calendar', t):
+    if RE_MESSAGE_KW.search(t) and RE_FOLLOWUP_KW.search(t):
         return {"supported": True, "intent": "FOLLOWUP_FROM_MESSAGE", "confidence": 0.91,
                 "routeType": "pcc", "servers": ["com.apple.messages.mcp", "com.apple.calendar.mcp"],
                 "privacyClass": "cross_context_local", "params": {}}
 
     # Web search
-    if re.search(r'search|google|look up', t):
-        query = re.sub(r'(search|the web|for|on google|on the internet|google|look up)', '', t).strip()
+    if RE_SEARCH_KW.search(t):
+        query = RE_SEARCH_CLEAN.sub('', t).strip()
         return {"supported": True, "intent": "WEB_SEARCH", "confidence": 0.90,
                 "routeType": "remote", "servers": ["com.apple.websearch.mcp"],
                 "privacyClass": "external_search", "params": {"query": query or "search"}}
 
     # Maps
-    if re.search(r'map|direction|navigate|where is', t):
-        query = re.sub(r'(open maps? to|show me|navigate to|directions? to|where is)', '', t).strip()
+    if RE_MAPS_KW.search(t):
+        query = RE_MAPS_CLEAN.sub('', t).strip()
         return {"supported": True, "intent": "OPEN_MAPS", "confidence": 0.92,
                 "routeType": "remote", "servers": ["com.apple.maps.mcp"],
                 "privacyClass": "remote_data", "params": {"query": query or "current location"}}
 
     # Send message
-    if re.search(r'send.*(message|text|imessage)', t):
+    if RE_SEND_MSG_KW.search(t):
         return {"supported": True, "intent": "SEND_MESSAGE", "confidence": 0.89,
                 "routeType": "local", "servers": ["com.apple.messages.mcp"],
                 "privacyClass": "local_safe", "params": {}}
 
     # Calendar event
-    if re.search(r'(create|add|schedule|new).*(event|meeting|appointment)', t):
+    if RE_EVENT_KW.search(t):
         return {"supported": True, "intent": "CREATE_EVENT", "confidence": 0.90,
                 "routeType": "local", "servers": ["com.apple.calendar.mcp"],
                 "privacyClass": "local_safe", "params": {}}
 
     # Generic open app
-    if re.search(r'open\s+(\w+)', t):
-        app_name = re.search(r'open\s+(\w+)', t).group(1)
+    m5 = RE_OPEN_APP.search(t)
+    if m5:
+        app_name = m5.group(1)
         return {"supported": True, "intent": "OPEN_APP", "confidence": 0.88,
                 "routeType": "local", "servers": ["com.apple.finder.mcp"],
                 "privacyClass": "local_safe", "params": {"app": app_name}}
@@ -335,14 +374,14 @@ def execute(plan: dict) -> dict:
 
     if intent == "SYSTEM_INFO":
         battery = run_cmd(["pmset", "-g", "batt"])
-        bat_match = re.search(r'(\d+)%', battery)
+        bat_match = RE_BATTERY_PCT.search(battery)
         bat_pct = bat_match.group(1) + "%" if bat_match else "N/A"
         mem = run_cmd(["sysctl", "-n", "hw.memsize"])
         try: mem_gb = f"{int(mem) / (1024**3):.0f}GB"
         except: mem_gb = "N/A"
         cpu = run_cmd(["sysctl", "-n", "machdep.cpu.brand_string"])
         disk = run_cmd(["df", "-h", "/"])
-        disk_match = re.search(r'(\d+)%', disk)
+        disk_match = RE_DISK_PCT.search(disk)
         disk_used = disk_match.group(0) if disk_match else "N/A"
         return {"log": "sysinfo · fetched", "entityId": f"sys_{uid()}",
                 "response": f"Battery: {bat_pct} · RAM: {mem_gb} · CPU: {cpu[:40]} · Disk: {disk_used} used"}
@@ -433,7 +472,7 @@ def execute(plan: dict) -> dict:
 # ── Multi-Command Splitter ────────────────────────────────────────────
 def split_commands(text: str) -> list:
     """Split "do X and then Y" into multiple commands."""
-    parts = re.split(r'\s+(?:and then|and also|and|then|also)\s+', text, flags=re.IGNORECASE)
+    parts = RE_SPLIT_CMD.split(text)
     return [p.strip() for p in parts if p.strip()]
 
 
