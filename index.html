@@ -1,1904 +1,462 @@
 <!doctype html>
 <html lang="en">
-
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Real Time Voice MCP</title>
-  <meta name="description" content="Real Time Voice MCP — Attention-Based Routing Engine by Vijay Arvind Ramamoorthy">
+  <title>Real Time Voice MCP - REDUX</title>
+  <meta name="description" content="Real Time Voice MCP — Cyber-Organic Redux">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;500;700;900&display=swap" rel="stylesheet">
   <style>
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0
-    }
-
     :root {
-      color-scheme: dark;
-      /* ── Muted, sophisticated palette ── */
-      --bg-0: #0b0b11;
-      --bg-1: #12121a;
-      --bg-2: #1a1a24;
-      --text-0: #e4e4ec;
-      --text-1: rgba(228, 228, 236, .6);
-      --text-2: rgba(228, 228, 236, .34);
-      --text-3: rgba(228, 228, 236, .18);
-      --blue: #7B9BF4;
-      --green: #5AD8A0;
-      --yellow: #EEBF64;
-      --red: #E06C6C;
-      --purple: #A78BDB;
-      --cyan: #5BD5D5;
-      --blue-dim: rgba(123, 155, 244, .10);
-      --green-dim: rgba(90, 216, 160, .08);
-      --yellow-dim: rgba(238, 191, 100, .08);
-      --red-dim: rgba(224, 108, 108, .08);
-      --purple-dim: rgba(167, 139, 219, .08);
-      --blue-glow: rgba(123, 155, 244, .18);
-      --green-glow: rgba(90, 216, 160, .15);
-      --yellow-glow: rgba(238, 191, 100, .14);
-      --red-glow: rgba(224, 108, 108, .16);
-      --purple-glow: rgba(167, 139, 219, .14);
-      /* ── Surfaces ── */
-      --glass: rgba(255, 255, 255, .035);
-      --glass-border: rgba(255, 255, 255, .07);
-      --glass-hover: rgba(255, 255, 255, .055);
-      --surface: rgba(0, 0, 0, .22);
-      /* ── Motion ── */
-      --spring: cubic-bezier(.34, 1.56, .64, 1);
-      --ease: cubic-bezier(.25, .46, .45, .94);
-      --ease-out: cubic-bezier(.16, 1, .3, 1);
-      /* ── Type ── */
-      --sans: 'Inter', -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-      --mono: 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+      --font-main: 'Unbounded', sans-serif;
+      --neon-cyan: #00f3ff;
+      --neon-pink: #ff00ff;
+      --neon-lime: #ccff00;
+      --void-black: #050505;
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --text-main: #ffffff;
+      --text-dim: rgba(255, 255, 255, 0.5);
     }
 
-    /* ── Reduced motion ── */
-    @media(prefers-reduced-motion:reduce) {
-
-      *,
-      *::before,
-      *::after {
-        animation-duration: 0.01ms !important;
-        transition-duration: 0.01ms !important
-      }
-    }
-
-    html {
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale
-    }
-
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: var(--sans);
-      color: var(--text-0);
-      background: var(--bg-0);
-      min-height: 100vh;
-      overflow-x: hidden;
-      font-size: 14px;
-      line-height: 1.6;
-      scroll-behavior: smooth;
-    }
-
-    /* ━━━ Scroll Architecture ━━━ */
-    .scroll-section {
-      min-height: 100vh;
+      background: var(--void-black);
+      color: var(--text-main);
+      font-family: var(--font-main);
+      overflow: hidden;
+      height: 100vh;
       display: flex;
       flex-direction: column;
+      align-items: center;
       justify-content: center;
-      padding: 80px 36px;
-      max-width: 1240px;
-      margin: 0 auto;
+    }
+
+    /* ━━━ Background Effects ━━━ */
+    .aurora-bg {
+      position: fixed; inset: 0; z-index: -1;
+      background: radial-gradient(circle at 50% 50%, #1a1a2e 0%, #000 70%);
+      filter: blur(80px); opacity: 0.6;
+      animation: pulseBg 10s infinite alternate;
+    }
+    @keyframes pulseBg { 0% { transform: scale(1); } 100% { transform: scale(1.1); } }
+
+    .grain-overlay {
+      position: fixed; inset: 0; z-index: -1; opacity: 0.05; pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    }
+
+    /* ━━━ Layout ━━━ */
+    .app-container {
+      width: 100%; height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: 2rem;
       position: relative;
-      z-index: 1;
-    }
-
-    /* ━━━ Animations (IntersectionObserver) ━━━ */
-    .reveal {
-      opacity: 0;
-      transform: translateY(40px);
-      transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .reveal.active {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .zoom-in {
-      opacity: 0;
-      transform: scale(0.92);
-      transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .zoom-in.active {
-      opacity: 1;
-      transform: scale(1);
-    }
-
-    .fade-up {
-      opacity: 0;
-      transform: translateY(20px);
-      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .fade-up.active {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* ━━━ Aurora mesh gradient background ━━━ */
-    .aurora {
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      pointer-events: none;
-      overflow: hidden;
-    }
-
-    .aurora::before,
-    .aurora::after {
-      content: '';
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(120px);
-      opacity: .35;
-      animation: auroraFloat 18s var(--ease) infinite alternate;
-    }
-
-    .aurora::before {
-      width: 600px;
-      height: 600px;
-      background: radial-gradient(circle, rgba(123, 155, 244, .4), transparent 70%);
-      top: -10%;
-      left: -5%;
-    }
-
-    .aurora::after {
-      width: 500px;
-      height: 500px;
-      background: radial-gradient(circle, rgba(167, 139, 219, .35), transparent 70%);
-      bottom: -15%;
-      right: -5%;
-      animation-delay: -6s;
-      animation-duration: 22s;
-    }
-
-    .aurora-accent {
-      position: absolute;
-      border-radius: 50%;
-      width: 400px;
-      height: 400px;
-      background: radial-gradient(circle, rgba(90, 216, 160, .2), transparent 70%);
-      top: 40%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      filter: blur(100px);
-      opacity: .3;
-      animation: auroraFloat 15s var(--ease) infinite alternate-reverse;
-    }
-
-    @keyframes auroraFloat {
-      0% {
-        transform: translate(0, 0) scale(1)
-      }
-
-      33% {
-        transform: translate(30px, -20px) scale(1.05)
-      }
-
-      66% {
-        transform: translate(-20px, 15px) scale(.95)
-      }
-
-      100% {
-        transform: translate(10px, -10px) scale(1.02)
-      }
-    }
-
-    /* ━━━ Grain texture overlay (SVG noise) ━━━ */
-    .grain {
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      pointer-events: none;
-      opacity: .03;
-      mix-blend-mode: overlay;
-    }
-
-    /* ━━━ Boot / star — hidden ━━━ */
-    #bootOverlay {
-      display: none
-    }
-
-    #starCanvas {
-      display: none
-    }
-
-    /* ━━━ App shell ━━━ */
-    .app {
-      position: relative;
-      z-index: 1;
-      width: 100%;
-      animation: appIn .6s var(--ease-out) both;
-    }
-
-    @keyframes appIn {
-      from {
-        opacity: 0;
-        transform: translateY(6px)
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0)
-      }
-    }
-
-    /* ━━━ Liquid glass card ━━━ */
-    .card {
-      background: var(--glass);
-      backdrop-filter: blur(24px) saturate(130%);
-      -webkit-backdrop-filter: blur(24px) saturate(130%);
-      border: 1px solid var(--glass-border);
-      border-radius: 14px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, .2), 0 8px 24px rgba(0, 0, 0, .12);
-      padding: 18px;
-      transition: border-color .25s var(--ease), box-shadow .25s var(--ease), transform 0.25s var(--ease);
-      position: relative;
-    }
-
-    .card::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: 14px;
-      background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-      opacity: .015;
-      mix-blend-mode: overlay;
-      pointer-events: none;
-      border-radius: inherit;
-    }
-
-    .card:hover {
-      border-color: rgba(255, 255, 255, .1);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, .3), 0 12px 32px rgba(0, 0, 0, .15);
-    }
-
-    /* ━━━ Premium Spotlight Hover Effect ━━━ */
-    .glow-surface {
-      position: relative;
-      overflow: hidden;
-    }
-
-    .glow-surface::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(circle 350px at var(--mouse-x, -500px) var(--mouse-y, -500px), rgba(255, 255, 255, 0.06), transparent 40%);
-      opacity: 0;
-      transition: opacity 0.3s;
-      pointer-events: none;
-      z-index: 10;
-      border-radius: inherit;
-    }
-
-    .glow-surface:hover::after {
-      opacity: 1;
-    }
-
-    .glow-surface>* {
-      position: relative;
-      z-index: 1;
-    }
-
-    /* ━━━ Dynamic Island Header ━━━ */
-    .dynamic-island {
-      position: fixed;
-      top: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(18, 18, 26, 0.7);
-      backdrop-filter: blur(32px) saturate(180%);
-      -webkit-backdrop-filter: blur(32px) saturate(180%);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 40px;
-      padding: 8px 16px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      z-index: 100;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05);
-      transition: all 0.4s var(--spring);
-    }
-
-    .dynamic-island:hover {
-      background: rgba(26, 26, 36, 0.8);
-      transform: translateX(-50%) scale(1.02);
-    }
-
-    .island-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .island-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 8px var(--green-glow);
-      animation: pulse 2s infinite;
-    }
-
-    .island-text {
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: var(--text-0);
-    }
-
-    /* ━━━ Hero Typography ━━━ */
-    .hero-title {
-      font-size: clamp(3rem, 6vw, 5.5rem);
-      font-weight: 700;
-      letter-spacing: -0.04em;
-      line-height: 1.05;
-      margin-bottom: 24px;
-      background: linear-gradient(180deg, #fff 0%, rgba(255, 255, 255, 0.6) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .hero-subtitle {
-      font-size: clamp(1.2rem, 2vw, 1.5rem);
-      color: var(--text-1);
-      font-weight: 400;
-      max-width: 600px;
-      line-height: 1.4;
-      margin-bottom: 48px;
     }
 
     /* ━━━ Header ━━━ */
-    .header {
+    header {
       text-align: center;
-      margin-bottom: 28px;
-      padding-top: 4px
+      z-index: 10;
+      pointer-events: none; /* Allow click-through */
     }
-
-    .header h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
-      letter-spacing: -.04em;
-      line-height: 1.2;
-      margin-bottom: 6px;
-    }
-
-    .header h1 .title-gradient {
-      background: linear-gradient(135deg, var(--blue), var(--purple) 40%, var(--cyan) 80%, var(--blue));
-      background-size: 300% 100%;
+    h1.mega-title {
+      font-size: clamp(2rem, 5vw, 4rem);
+      font-weight: 900;
+      letter-spacing: -0.05em;
+      text-transform: uppercase;
+      background: linear-gradient(180deg, #fff, rgba(255,255,255,0.4));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      background-clip: text;
-      animation: titleShift 6s ease infinite;
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      font-size: 0.8rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-dim);
     }
 
-    @keyframes titleShift {
-      0% {
-        background-position: 0% 50%
-      }
-
-      50% {
-        background-position: 100% 50%
-      }
-
-      100% {
-        background-position: 0% 50%
-      }
+    /* ━━━ Main Interaction Zone ━━━ */
+    main {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      position: relative;
+      z-index: 5;
     }
 
-    .header .subtitle {
-      font-size: .8rem;
-      font-weight: 400;
-      color: var(--text-2);
-      letter-spacing: .02em
+    /* Giant Orb */
+    .orb-container {
+      position: relative;
+      width: clamp(280px, 40vw, 500px);
+      height: clamp(280px, 40vw, 500px);
+      display: flex; align-items: center; justify-content: center;
     }
 
-    /* hidden elements */
-    .gradient-badge {
-      display: none
-    }
-
-    .id-card {
-      display: none
-    }
-
-    .id-progress {
-      display: none
-    }
-
-    .id-live-dot {
-      width: 6px;
-      height: 6px;
+    /* Reusing #micBtn logic but styling it huge */
+    #micBtn {
+      width: 100%; height: 100%;
       border-radius: 50%;
-      background: var(--green);
-      animation: blink 2s ease-in-out infinite
-    }
-
-    .id-live-dot.off {
-      background: var(--text-3);
-      animation: none
-    }
-
-    @keyframes blink {
-
-      0%,
-      100% {
-        opacity: 1
-      }
-
-      50% {
-        opacity: .3
-      }
-    }
-
-    /* ━━━ Panel labels ━━━ */
-    .panel-label {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      color: var(--text-2);
-      margin-bottom: 12px;
-    }
-
-    /* ━━━ Mic button (compact inline) ━━━ */
-    .mic-area {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 24px;
-      margin-top: 12px;
-    }
-
-    .mic-btn {
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      border: 1px solid var(--glass-border);
-      background: var(--glass);
+      background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+      border: 1px solid rgba(255,255,255,0.1);
       cursor: pointer;
       position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all .2s var(--ease);
-      box-shadow: none;
-      animation: none;
-      backdrop-filter: none;
-      -webkit-backdrop-filter: none;
+      overflow: visible; /* Let ripples expand */
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 0 30px rgba(0,0,0,0.5);
+    }
+    #micBtn:hover {
+      border-color: var(--neon-cyan);
+      box-shadow: 0 0 50px rgba(0, 243, 255, 0.2);
+      transform: scale(1.02);
+    }
+    #micBtn.listening {
+      border-color: var(--neon-pink);
+      background: radial-gradient(circle, rgba(255, 0, 255, 0.1) 0%, transparent 70%);
+      box-shadow: 0 0 80px rgba(255, 0, 255, 0.3);
+      animation: pulseOrb 2s infinite ease-in-out;
+    }
+    @keyframes pulseOrb {
+      0%, 100% { box-shadow: 0 0 60px rgba(255, 0, 255, 0.3); transform: scale(1); }
+      50% { box-shadow: 0 0 100px rgba(255, 0, 255, 0.5); transform: scale(1.05); }
     }
 
-    .mic-btn svg {
-      width: 16px;
-      height: 16px;
-      fill: var(--text-2);
-      transition: fill .15s;
-      z-index: 2
-    }
-
-    .mic-btn:hover {
-      background: var(--glass-hover);
-      border-color: rgba(255, 255, 255, .12);
-      transform: none
-    }
-
-    .mic-btn:hover svg {
-      fill: var(--text-1)
-    }
-
-    .mic-btn:active {
-      transform: scale(.9)
-    }
-
-    .mic-btn.listening {
-      border-color: var(--blue);
-      background: var(--blue-dim);
-      box-shadow: 0 0 16px var(--blue-glow);
-      animation: none
-    }
-
-    .mic-btn.listening svg {
-      fill: var(--blue)
-    }
-
-    .mic-btn.processing {
-      animation: spin 1.2s linear infinite;
-      filter: none
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg)
-      }
-    }
-
-    .mic-ring {
-      position: absolute;
-      border-radius: 50%;
-      border: 1px solid var(--blue);
-      opacity: 0;
-      pointer-events: none
-    }
-
-    .mic-btn.listening .mic-ring {
-      animation: ring 2s ease-out infinite
-    }
-
-    .mic-btn.listening .mic-ring:nth-child(2) {
-      animation-delay: .65s
-    }
-
-    .mic-btn.listening .mic-ring:nth-child(3) {
-      animation-delay: 1.3s
-    }
-
-    @keyframes ring {
-      0% {
-        width: 38px;
-        height: 38px;
-        opacity: .25
-      }
-
-      100% {
-        width: 68px;
-        height: 68px;
-        opacity: 0
-      }
-    }
-
-    .mic-label {
-      font-size: 11px;
-      font-weight: 400;
-      color: var(--text-2);
-      min-height: 16px;
-      text-align: center
-    }
-
+    /* The visualizer canvas inside the button */
     #micVisualizer {
-      position: absolute;
-      inset: 0;
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 1
-    }
-
-    /* ━━━ Controls ━━━ */
-    .controls-card {
-      margin-bottom: 20px
-    }
-
-    .controls-row {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap
-    }
-
-    .input-wrap {
-      flex: 1;
-      min-width: 180px;
-      position: relative
-    }
-
-    .input-wrap input {
-      width: 100%;
-      height: 40px;
-      border-radius: 10px;
-      border: 1px solid var(--glass-border);
-      background: var(--surface);
-      color: var(--text-0);
-      font-family: var(--sans);
-      font-size: 13px;
-      padding: 0 14px;
-      transition: border-color .2s, box-shadow .2s;
-    }
-
-    .input-wrap input::placeholder {
-      color: var(--text-3)
-    }
-
-    .input-wrap input:focus {
-      outline: none;
-      border-color: var(--blue);
-      box-shadow: 0 0 0 3px rgba(123, 155, 244, .08)
-    }
-
-    .input-wrap input.interim {
-      font-style: italic;
-      color: var(--text-2)
-    }
-
-    .input-wrap .mic-icon {
-      position: absolute;
-      right: 14px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 16px;
-      opacity: 0.6;
-      pointer-events: none;
-    }
-
-    /* Intent badge */
-    .intent-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 5px 12px;
-      border-radius: 100px;
-      font-size: 11px;
-      font-weight: 500;
-      background: var(--blue-dim);
-      border: 1px solid rgba(123, 155, 244, .15);
-      color: var(--blue);
-      white-space: nowrap;
-      transition: all .25s var(--ease);
-      min-height: 30px;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .intent-badge .conf-ring {
-      width: 20px;
-      height: 20px;
-      flex-shrink: 0
-    }
-
-    .intent-badge .conf-ring circle {
-      transition: stroke-dashoffset .35s var(--ease)
-    }
-
-    /* Toggles — compact pill */
-    .toggle-group {
-      display: flex;
-      gap: 10px;
-      align-items: center
-    }
-
-    .toggle-wrap {
-      display: flex;
-      align-items: center;
-      gap: 5px
-    }
-
-    .toggle-label {
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--text-2)
-    }
-
-    .toggle {
-      width: 34px;
-      height: 20px;
-      border-radius: 10px;
-      position: relative;
-      cursor: pointer;
-      background: rgba(255, 255, 255, .08);
-      border: none;
-      transition: background .2s var(--ease);
-    }
-
-    .toggle::after {
-      content: '';
-      position: absolute;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      top: 2px;
-      left: 2px;
-      background: #fff;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, .2);
-      transition: transform .2s var(--spring);
-    }
-
-    .toggle.on {
-      background: var(--green)
-    }
-
-    .toggle.on::after {
-      transform: translateX(14px)
-    }
-
-    /* Presets — 2-col */
-    .presets {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 6px;
-      margin-top: 12px
-    }
-
-    .preset-btn {
-      border: 1px solid var(--glass-border);
-      border-radius: 10px;
-      background: var(--glass);
-      color: var(--text-1);
-      font-family: var(--sans);
-      font-size: 12px;
-      font-weight: 500;
-      padding: 9px 14px;
-      cursor: pointer;
-      text-align: left;
-      transition: all .15s var(--ease);
-      line-height: 1.3;
-    }
-
-    .preset-btn:hover:not(:disabled) {
-      background: var(--glass-hover);
-      border-color: rgba(255, 255, 255, .1)
-    }
-
-    .preset-btn:active:not(:disabled) {
-      transform: scale(.97)
-    }
-
-    .preset-btn:disabled {
-      opacity: .25;
-      cursor: not-allowed
-    }
-
-    .preset-btn small {
-      display: block;
-      margin-top: 2px;
-      font-size: 9.5px;
-      font-weight: 400;
-      color: var(--text-3)
-    }
-
-    /* Speak button */
-    .speak-btn {
-      height: 40px;
-      min-width: 90px;
-      border: none;
-      border-radius: 10px;
-      background: linear-gradient(135deg, var(--blue), color-mix(in srgb, var(--purple) 40%, var(--blue)));
-      color: #fff;
-      font-family: var(--sans);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 5px;
-      transition: all .15s var(--ease);
-      box-shadow: 0 2px 12px var(--blue-glow);
-    }
-
-    .speak-btn:hover:not(:disabled) {
-      filter: brightness(1.12);
-      box-shadow: 0 4px 20px var(--blue-glow)
-    }
-
-    .speak-btn:active:not(:disabled) {
-      transform: scale(.96)
-    }
-
-    .speak-btn:disabled {
-      opacity: .25;
-      cursor: not-allowed
-    }
-
-    .speak-btn:disabled.processing {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      border-radius: 50%; pointer-events: none;
       opacity: 0.8;
-      cursor: wait;
+      mix-blend-mode: screen;
     }
 
-    .spinner-icon {
-      animation: spin 1s linear infinite;
+    /* Center Icon */
+    .mic-icon-center {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 48px; height: 48px;
+      fill: var(--text-dim); transition: fill 0.3s; pointer-events: none;
     }
-
-    .speak-btn svg {
-      width: 14px;
-      height: 14px;
-      fill: currentColor
-    }
-
-    /* ━━━ Main layout ━━━ */
-    .main-layout {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-      align-items: start
-    }
-
-    /* ━━━ Pipeline SVG ━━━ */
-    .pipeline-wrap {
-      position: relative;
-      padding: 12px 0
-    }
-
-    .pipeline-svg {
-      width: 100%;
-      height: auto;
-      display: block
-    }
-
-    .stage-rect {
-      fill: rgba(20, 20, 28, .9);
-      stroke: rgba(255, 255, 255, .06);
-      stroke-width: 1;
-      rx: 10;
-      transition: stroke .3s, fill .3s, filter .3s
-    }
-
-    .stage-label {
-      fill: var(--text-0);
-      font-family: var(--sans);
-      font-size: 10px;
-      font-weight: 700;
-      text-anchor: middle;
-      letter-spacing: .08em;
-      pointer-events: none
-    }
-
-    .stage-sub {
-      fill: var(--text-2);
-      font-family: var(--mono);
-      font-size: 7.5px;
-      font-weight: 500;
-      text-anchor: middle;
-      pointer-events: none
-    }
-
-    .conn-line {
-      stroke: rgba(255, 255, 255, .04);
-      stroke-width: 1.5;
-      fill: none;
-      transition: stroke .35s
-    }
-
-    .conn-arrow {
-      fill: rgba(255, 255, 255, .04);
-      transition: fill .35s
-    }
-
-    .flow-particle {
-      r: 2.5;
-      fill: var(--blue);
-      opacity: 0;
-      filter: drop-shadow(0 0 4px var(--blue))
-    }
-
-    .flow-particle.running {
-      opacity: 1;
-      animation: pGlow .8s ease-in-out infinite
-    }
-
-    /* Stage states */
-    .stage-node.active .stage-rect {
-      stroke: var(--blue);
-      stroke-width: 1.5;
-      fill: var(--blue-dim);
-      filter: drop-shadow(0 0 10px var(--blue-glow));
-      animation: sPulse 2s ease-in-out infinite
-    }
-
-    .stage-node.success .stage-rect {
-      stroke: var(--green);
-      fill: var(--green-dim);
-      filter: drop-shadow(0 0 6px var(--green-glow))
-    }
-
-    .stage-node.error .stage-rect {
-      stroke: var(--red);
-      fill: var(--red-dim);
-      filter: drop-shadow(0 0 6px var(--red-glow))
-    }
-
-    .stage-node.pcc .stage-rect {
-      stroke: var(--yellow);
-      fill: var(--yellow-dim);
-      filter: drop-shadow(0 0 6px var(--yellow-glow))
-    }
-
-    .conn-line.lit-ok {
-      stroke: var(--green);
-      filter: drop-shadow(0 0 4px var(--green-glow))
-    }
-
-    .conn-line.lit-err {
-      stroke: var(--red);
-      filter: drop-shadow(0 0 4px var(--red-glow))
-    }
-
-    .conn-line.lit-pcc {
-      stroke: var(--yellow);
-      filter: drop-shadow(0 0 4px var(--yellow-glow))
-    }
-
-    .conn-line.lit-active {
-      stroke: var(--blue);
-      filter: drop-shadow(0 0 4px var(--blue-glow))
-    }
-
-    .conn-arrow.lit-ok {
-      fill: var(--green)
-    }
-
-    .conn-arrow.lit-err {
-      fill: var(--red)
-    }
-
-    .conn-arrow.lit-pcc {
-      fill: var(--yellow)
-    }
-
-    .conn-arrow.lit-active {
-      fill: var(--blue)
-    }
-
-    @keyframes sPulse {
-
-      0%,
-      100% {
-        filter: drop-shadow(0 0 8px var(--blue-glow))
-      }
-
-      50% {
-        filter: drop-shadow(0 0 16px var(--blue-glow))
-      }
-    }
-
-    @keyframes pGlow {
-
-      0%,
-      100% {
-        opacity: .4
-      }
-
-      50% {
-        opacity: 1
-      }
-    }
-
-    @keyframes stagePopIn {
-      0% {
-        transform: scale(1)
-      }
-
-      50% {
-        transform: scale(1.04)
-      }
-
-      100% {
-        transform: scale(1)
-      }
-    }
-
-    /* ━━━ Log panel ━━━ */
-    .log-panel {
-      background: var(--surface);
-      border-radius: 10px;
-      padding: 14px 16px;
-      min-height: 160px;
-      max-height: 300px;
-      overflow-y: auto;
-      font-family: var(--mono);
-      font-size: 12px;
-      line-height: 1.7;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(255, 255, 255, .06) transparent;
-    }
-
-    .log-panel::-webkit-scrollbar {
-      width: 4px
-    }
-
-    .log-panel::-webkit-scrollbar-track {
-      background: transparent
-    }
-
-    .log-panel::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, .06);
-      border-radius: 2px
-    }
-
-    .log-line {
-      opacity: 0;
-      transform: translateX(-8px);
-      animation: logIn .3s var(--ease) forwards;
-      margin-bottom: 2px;
-      white-space: pre-wrap;
-      color: var(--text-1)
-    }
-
-    .log-line .stage-tag {
-      color: var(--blue);
-      font-weight: 600
-    }
-
-    .log-line .mark-ok {
-      color: var(--green);
-      font-weight: 700
-    }
-
-    .log-line .mark-err {
-      color: var(--red);
-      font-weight: 700
-    }
-
-    .log-line .mark-pcc {
-      color: var(--yellow);
-      font-weight: 700
-    }
-
-    @keyframes logIn {
-      to {
-        opacity: 1;
-        transform: translateX(0)
-      }
-    }
-
-    /* Legend */
-    .legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 12px
-    }
-
-    .legend-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--glass-border);
-      background: var(--glass);
-      font-size: 10px;
-      font-family: var(--mono);
-      color: var(--text-2);
-      font-weight: 500;
-    }
-
-    .legend-dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%
-    }
-
-    /* ━━━ Server registry ━━━ */
-    .server-list {
-      display: grid;
-      gap: 6px
-    }
-
-    .server-row {
-      display: grid;
-      grid-template-columns: 1fr auto auto;
-      gap: 8px;
-      align-items: center;
-      border: 1px solid var(--glass-border);
-      border-radius: 10px;
-      padding: 10px 12px;
-      background: var(--glass);
-      font-family: var(--mono);
-      font-size: 11px;
-      transition: all .3s var(--ease);
-      border-left: 3px solid transparent;
-    }
-
-    .server-row .srv-name {
-      color: var(--text-0);
-      font-weight: 500;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap
-    }
-
-    .server-row .srv-scope {
-      color: var(--text-2);
-      font-size: 9px;
-      font-weight: 600;
-      letter-spacing: .06em
-    }
-
-    .server-row .srv-status {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 10px;
-      color: var(--text-2)
-    }
-
-    .srv-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      flex-shrink: 0
-    }
-
-    .srv-dot.on {
-      background: var(--green);
-      box-shadow: 0 0 6px var(--green-glow)
-    }
-
-    .srv-dot.off {
-      background: var(--red);
-      box-shadow: 0 0 6px var(--red-glow)
-    }
-
-    .server-row.hit {
-      border-color: rgba(123, 155, 244, .3);
-      background: var(--blue-dim);
-      box-shadow: 0 0 14px rgba(123, 155, 244, .06);
-      transform: scale(1.01)
-    }
-
-    @keyframes borderFlash {
-      0% {
-        border-left-color: var(--blue)
-      }
-
-      100% {
-        border-left-color: transparent
-      }
-    }
-
-    /* ━━━ Session panel ━━━ */
-    .session-grid {
-      display: grid;
-      gap: 8px;
-      font-family: var(--mono);
-      font-size: 12px
-    }
-
-    .session-grid .s-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1px 0
-    }
-
-    .session-grid .s-key {
-      color: var(--text-2);
-      font-weight: 300
-    }
-
-    .session-grid .s-val {
-      color: var(--text-0);
-      font-weight: 500;
-      font-variant-numeric: tabular-nums
-    }
-
-    .s-val.expiry-warn {
-      color: var(--yellow)
-    }
-
-    .s-val.expiry-crit {
-      color: var(--red);
-      animation: exPulse .8s ease-in-out infinite
-    }
-
-    @keyframes exPulse {
-
-      0%,
-      100% {
-        opacity: 1
-      }
-
-      50% {
-        opacity: .4
-      }
-    }
-
-    /* Error pill */
-    .error-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 8px;
-      border-radius: 6px;
-      background: var(--red-dim);
-      color: var(--red);
-      font-size: 10px;
-      font-weight: 600;
-      border: 1px solid rgba(224, 108, 108, .2)
-    }
-
-    /* ━━━ Analytics Section ━━━ */
-    .analytics-section {
-      margin-top: 28px;
-      animation: fadeUp .4s var(--ease-out) .1s both
-    }
-
-    @keyframes fadeUp {
-      from {
-        opacity: 0;
-        transform: translateY(8px)
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0)
-      }
-    }
-
-    .section-title {
-      font-size: 1.1rem;
-      font-weight: 700;
-      letter-spacing: -.03em;
-      margin-bottom: 16px;
-      color: var(--text-0)
-    }
-
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-bottom: 16px
-    }
-
-    .metric-card {
-      background: var(--glass);
-      border: 1px solid var(--glass-border);
-      border-radius: 12px;
-      padding: 16px;
+    #micBtn:hover .mic-icon-center { fill: var(--text-main); }
+    #micBtn.listening .mic-icon-center { fill: var(--neon-pink); }
+
+    /* Massive Text Input */
+    .input-zone {
+      margin-top: 2rem;
+      width: 100%; max-width: 900px;
       text-align: center;
-      transition: border-color .2s;
-    }
-
-    .metric-card:hover {
-      border-color: rgba(255, 255, 255, .1)
-    }
-
-    .metric-value {
-      font-size: 1.5rem;
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: -.02em
-    }
-
-    .metric-value.blue {
-      color: var(--blue)
-    }
-
-    .metric-value.green {
-      color: var(--green)
-    }
-
-    .metric-value.yellow {
-      color: var(--yellow)
-    }
-
-    .metric-value.purple {
-      color: var(--purple)
-    }
-
-    .metric-label {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      color: var(--text-2);
-      margin-top: 2px
-    }
-
-    .metric-sub {
-      font-size: 10px;
-      color: var(--text-3);
-      margin-top: 4px;
-      font-family: var(--mono)
-    }
-
-    .percentile-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin-bottom: 16px
-    }
-
-    .pctl-card {
-      background: var(--glass);
-      border: 1px solid var(--glass-border);
-      border-radius: 10px;
-      padding: 14px;
       position: relative;
-      overflow: hidden
     }
-
-    .pctl-label {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      color: var(--text-2)
-    }
-
-    .pctl-value {
-      font-size: 1.05rem;
-      font-weight: 700;
-      color: var(--text-0);
-      margin: 4px 0;
-      font-variant-numeric: tabular-nums
-    }
-
-    .pctl-bar {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      height: 3px;
-      border-radius: 0 2px 0 0;
-      transition: width .4s var(--ease)
-    }
-
-    .analytics-panels {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 16px
-    }
-
-    .analytics-sub-card {
-      background: var(--glass);
-      border: 1px solid var(--glass-border);
-      border-radius: 10px;
-      padding: 14px
-    }
-
-    .sub-title {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      color: var(--text-2);
-      margin-bottom: 10px
-    }
-
-    .intent-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px
-    }
-
-    .intent-name {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--text-1);
-      min-width: 100px;
-      flex-shrink: 0
-    }
-
-    .intent-bar-bg {
-      flex: 1;
-      height: 6px;
-      border-radius: 3px;
-      background: rgba(255, 255, 255, .04);
-      overflow: hidden
-    }
-
-    .intent-bar-fill {
-      height: 100%;
-      border-radius: 3px;
-      transition: width .35s var(--ease)
-    }
-
-    .intent-count {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--text-2);
-      min-width: 24px;
-      text-align: right
-    }
-
-    /* History table */
-    .history-scroll {
-      max-height: 200px;
-      overflow-y: auto;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(255, 255, 255, .06) transparent
-    }
-
-    .history-table {
+    #commandInput {
       width: 100%;
-      border-collapse: collapse;
-      font-family: var(--mono);
-      font-size: 11px
-    }
-
-    .history-table th {
-      font-weight: 600;
-      color: var(--text-2);
-      text-align: left;
-      padding: 6px 8px;
-      border-bottom: 1px solid var(--glass-border);
-      font-size: 9px;
-      letter-spacing: .06em;
-      text-transform: uppercase
-    }
-
-    .history-table td {
-      padding: 6px 8px;
-      border-bottom: 1px solid rgba(255, 255, 255, .03);
-      color: var(--text-1)
-    }
-
-    .history-table tr:hover td {
-      background: var(--glass)
-    }
-
-    .status-dot {
-      display: inline-block;
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      margin-right: 5px;
-      vertical-align: middle
-    }
-
-    .status-dot.s-ok {
-      background: var(--green);
-      box-shadow: 0 0 4px var(--green-glow)
-    }
-
-    .status-dot.s-err {
-      background: var(--red);
-      box-shadow: 0 0 4px var(--red-glow)
-    }
-
-    .status-dot.s-pcc {
-      background: var(--yellow);
-      box-shadow: 0 0 4px var(--yellow-glow)
-    }
-
-    /* ━━━ Responsive ━━━ */
-    @media(max-width:1024px) {
-      .app {
-        padding: 20px 18px 36px
-      }
-
-      .main-layout {
-        grid-template-columns: 1fr
-      }
-
-      .presets {
-        grid-template-columns: repeat(2, 1fr)
-      }
-
-      .metrics-grid {
-        grid-template-columns: repeat(2, 1fr)
-      }
-
-      .analytics-panels {
-        grid-template-columns: 1fr
-      }
-    }
-
-    @media(max-width:768px) {
-      .app {
-        padding: 14px 12px 28px
-      }
-
-      .header h1 {
-        font-size: 1.35rem
-      }
-
-      .controls-row {
-        flex-direction: column
-      }
-
-      .input-wrap {
-        min-width: 100%
-      }
-
-      .mic-btn {
-        width: 34px;
-        height: 34px
-      }
-
-      .presets {
-        grid-template-columns: 1fr 1fr
-      }
-
-      .metrics-grid {
-        grid-template-columns: 1fr 1fr
-      }
-
-      .percentile-row {
-        grid-template-columns: 1fr
-      }
-    }
-
-    @media(max-width:480px) {
-      .presets {
-        grid-template-columns: 1fr
-      }
-
-      .header h1 {
-        font-size: 1.15rem
-      }
-
-      .metrics-grid {
-        grid-template-columns: 1fr
-      }
-    }
-
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      border: 0
-    }
-
-    :focus-visible {
-      outline: 2px solid var(--blue);
-      outline-offset: 2px
-    }
-
-    ::selection {
-      background: rgba(123, 155, 244, .25)
-    }
-
-    .section-divider {
-      height: 1px;
-      background: var(--glass-border);
-      margin: 16px 0
-    }
-
-    .empty-state {
-      color: var(--text-3);
-      font-size: 12px;
-      font-weight: 400;
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      font-family: var(--font-main);
+      font-size: clamp(1.5rem, 4vw, 3rem);
+      font-weight: 700;
       text-align: center;
+      outline: none;
+      text-shadow: 0 0 20px rgba(255,255,255,0.2);
+    }
+    #commandInput::placeholder { color: var(--text-dim); opacity: 0.3; font-weight: 300; }
+
+    /* Intent Badge (Floating) */
+    #intentBadge {
+      margin-top: 1rem;
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    #intentText { color: var(--neon-cyan); font-weight: 700; }
+
+    /* ━━━ HUD (Bottom) ━━━ */
+    .hud-deck {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 1rem;
+      align-items: end;
+      padding-top: 2rem;
+      border-top: 1px solid var(--glass-border);
+      background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, transparent 100%);
+    }
+
+    .hud-panel {
+      padding: 1rem;
+    }
+
+    /* Controls (Toggles) */
+    .controls-row {
+      display: flex; gap: 1rem; justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .toggle {
+      width: 40px; height: 24px; border-radius: 12px;
+      background: rgba(255,255,255,0.1); border: none; position: relative; cursor: pointer;
+      transition: background 0.3s;
+    }
+    .toggle::after {
+      content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px;
+      background: #fff; border-radius: 50%; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .toggle.on { background: var(--neon-lime); }
+    .toggle.on::after { transform: translateX(16px); }
+
+    .control-label {
+      font-size: 0.7rem; text-transform: uppercase; color: var(--text-dim); text-align: center; margin-top: 0.5rem;
+    }
+
+    /* Run Button */
+    #speakBtn {
+      background: var(--neon-cyan);
+      color: #000; border: none;
+      padding: 0.8rem 2rem; border-radius: 8px;
+      font-family: var(--font-main); font-weight: 900; text-transform: uppercase;
+      cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+    }
+    #speakBtn:hover { transform: translateY(-2px); box-shadow: 0 0 40px rgba(0, 243, 255, 0.6); }
+    #speakBtn:active { transform: translateY(0); }
+    #speakBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Hidden/Legacy Containers (Required for JS compatibility) */
+    #legacy-container {
+      position: absolute; top: -9999px; left: -9999px; visibility: hidden; pointer-events: none;
+    }
+    /* Note: JS manipulates classes on stage nodes. We can observe them or just let them be.
+       Wait, if I hide them, the user won't see the pipeline.
+       I need to visualize the pipeline in the HUD.
+    */
+
+    /* New Pipeline Visualization (HUD) */
+    .pipeline-hud {
+      display: flex; gap: 4px; height: 40px; align-items: center;
+      background: rgba(255,255,255,0.02); padding: 4px; border-radius: 8px;
+      border: 1px solid var(--glass-border);
+    }
+    .hud-stage {
+      flex: 1; height: 100%;
+      background: rgba(255,255,255,0.05);
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.6rem; font-weight: 700; color: var(--text-dim);
+      transition: all 0.3s;
+    }
+    .hud-stage.active { background: var(--neon-cyan); color: #000; box-shadow: 0 0 10px var(--neon-cyan); }
+    .hud-stage.success { background: var(--neon-lime); color: #000; }
+    .hud-stage.error { background: var(--neon-pink); color: #fff; }
+
+    /* Presets (Floating Drawer or Grid) */
+    #presetGrid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;
+      margin-top: 1rem; opacity: 0.6; transition: opacity 0.3s;
+    }
+    #presetGrid:hover { opacity: 1; }
+    .preset-btn {
+      background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+      color: var(--text-dim); padding: 0.5rem; border-radius: 6px;
+      cursor: pointer; text-align: left; font-family: var(--font-main); font-size: 0.7rem;
+    }
+    .preset-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-main); }
+
+    /* Logs (Terminal Style) */
+    #logPanel {
+      height: 150px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 0.7rem;
+      color: var(--text-dim); background: rgba(0,0,0,0.5); padding: 0.5rem; border-radius: 6px;
+      border: 1px solid var(--glass-border);
+    }
+    .log-line { margin-bottom: 2px; }
+    .mark-ok { color: var(--neon-lime); }
+    .mark-err { color: var(--neon-pink); }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1.mega-title { font-size: 2rem; }
+      .orb-container { width: 200px; height: 200px; }
+      #commandInput { font-size: 1.5rem; }
+      .hud-deck { grid-template-columns: 1fr; text-align: center; }
     }
   </style>
 </head>
-
 <body>
-  <!-- Aurora mesh gradient background -->
-  <div class="aurora">
-    <div class="aurora-accent"></div>
+
+  <div class="aurora-bg"></div>
+  <div class="grain-overlay"></div>
+
+  <!-- Legacy IDs for JS Compatibility (Hidden but functional) -->
+  <div id="legacy-container">
+    <div id="bootOverlay"></div>
+    <canvas id="starCanvas"></canvas> <!-- Hidden stars -->
+    <div id="appShell"></div>
+    <div id="dynamicIsland">
+       <span id="liveDot"></span><span id="liveLabel"></span><span id="stageCount"></span>
+    </div>
+    <div id="idProgress">
+      <div class="prog-step" data-stage="0"></div><div class="prog-step" data-stage="1"></div>
+      <div class="prog-step" data-stage="2"></div><div class="prog-step" data-stage="3"></div>
+      <div class="prog-step" data-stage="4"></div><div class="prog-step" data-stage="5"></div>
+      <div class="prog-step" data-stage="6"></div><div class="prog-step" data-stage="7"></div>
+    </div>
+    <!-- Hidden Pipeline Logic -->
+    <div id="pipeline-section">
+      <!-- We keep the structure the JS expects, but hide it -->
+      <div id="stage-invocation"></div><div id="conn-0"></div><div id="arrow-0"></div><div id="particle-0"></div>
+      <div id="stage-asr"></div><div id="conn-1"></div><div id="arrow-1"></div><div id="particle-1"></div>
+      <div id="stage-attention"></div><div id="conn-2"></div><div id="arrow-2"></div><div id="particle-2"></div>
+      <div id="stage-privacy"></div><div id="conn-3"></div><div id="arrow-3"></div><div id="particle-3"></div>
+      <div id="stage-router"></div><div id="conn-4"></div><div id="arrow-4"></div><div id="particle-4"></div>
+      <div id="stage-mcp"></div><div id="conn-5"></div><div id="arrow-5"></div><div id="particle-5"></div>
+      <div id="stage-execution"></div><div id="conn-6"></div><div id="arrow-6"></div><div id="particle-6"></div>
+      <div id="stage-response"></div>
+    </div>
+    <!-- Analytics elements required by JS -->
+    <div id="analyticsSection">
+        <div id="m-total"></div><div id="m-rate"></div><div id="m-success"></div><div id="m-success-n"></div>
+        <div id="m-conf"></div><div id="m-conf-range"></div><div id="m-latency"></div><div id="m-latency-range"></div>
+        <div id="p50"></div><div id="p90"></div><div id="p99"></div>
+        <div id="p50bar"></div><div id="p90bar"></div><div id="p99bar"></div>
+        <canvas id="sparkCanvas"></canvas>
+        <div id="intentBreakdown"></div>
+        <tbody id="historyBody"></tbody>
+        <div id="metricsGrid"></div>
+    </div>
+    <div id="serverList"></div>
+    <div id="session-id"></div><div id="session-active"></div><div id="session-turns"></div><div id="session-entity"></div><div id="session-expiry"></div>
+
+    <!-- Original Mic Visualizer (We reuse the ID on the main canvas) -->
+    <!-- Wait, I need a separate canvas if the JS draws to it?
+         Yes, the JS draws to #micVisualizer. I will put that ID on my MAIN orb canvas.
+         The JS expects to clearRect(0,0,w,h). If I style it 500x500, w/h will be 500.
+    -->
+    <span id="micLabel"></span> <!-- Hidden label -->
+    <svg id="confArc"></svg> <!-- Hidden arc -->
   </div>
 
-  <!-- SVG noise grain texture -->
-  <svg class="grain" width="100%" height="100%">
-    <filter id="grain">
-      <feTurbulence type="fractalNoise" baseFrequency=".75" numOctaves="4" stitchTiles="stitch" />
-    </filter>
-    <rect width="100%" height="100%" filter="url(#grain)" />
-  </svg>
+  <div class="app-container">
+    <header>
+      <div class="subtitle">System Online</div>
+      <h1 class="mega-title">Voice MCP</h1>
+      <div class="subtitle" id="status-readout">Ready for Input</div>
+    </header>
 
-  <!-- Boot overlay (hidden via CSS) -->
-  <div id="bootOverlay"></div>
-
-  <!-- Star field (hidden via CSS) -->
-  <canvas id="starCanvas"></canvas>
-
-  <!-- Dynamic Island Header -->
-  <div class="dynamic-island" id="dynamicIsland">
-    <div class="island-status">
-      <span class="island-dot" id="liveDot"></span>
-      <span class="island-text" id="liveLabel">Voice Assistant Active</span>
-    </div>
-    <div class="island-text" style="color:var(--text-2);" id="stageCount">0 / 8 stages</div>
-  </div>
-
-  <!-- Hidden Legacy Structs for JS Compatibility -->
-  <div style="display:none;" id="idProgress">
-    <div class="prog-step" data-stage="0"></div>
-    <div class="prog-step" data-stage="1"></div>
-    <div class="prog-step" data-stage="2"></div>
-    <div class="prog-step" data-stage="3"></div>
-    <div class="prog-step" data-stage="4"></div>
-    <div class="prog-step" data-stage="5"></div>
-    <div class="prog-step" data-stage="6"></div>
-    <div class="prog-step" data-stage="7"></div>
-  </div>
-
-  <!-- Hero Section -->
-  <section class="scroll-section" id="hero-section">
-    <div class="header reveal">
-      <h1 class="hero-title">Real Time Voice MCP</h1>
-      <p class="hero-subtitle">Speak naturally. Watch as advanced attention-based voice routing connects you to powerful
-        macOS actions in real-time.</p>
-    </div>
-
-    <!-- Mic + Controls -->
-    <div class="card controls-card reveal" style="animation-delay: 0.1s;">
-      <div class="mic-area">
-        <button class="mic-btn" id="micBtn" type="button" aria-label="Microphone">
-          <div class="mic-ring"></div>
-          <div class="mic-ring"></div>
-          <div class="mic-ring"></div>
-          <canvas id="micVisualizer" width="72" height="72"></canvas>
-          <svg viewBox="0 0 24 24">
-            <path
-              d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm-1 14.93A7.01 7.01 0 0 1 5 9h2a5 5 0 0 0 10 0h2a7.01 7.01 0 0 1-6 6.93V20h4v2H7v-2h4v-4.07z" />
-          </svg>
-        </button>
-        <div class="mic-label" id="micLabel">Tap to speak</div>
-      </div>
-
-      <div class="controls-row">
-        <div class="input-wrap">
-          <label class="sr-only" for="commandInput">Command</label>
-          <input id="commandInput" type="text" placeholder="Type a voice command or tap the mic..."
-            value="Set a timer for 10 minutes" />
-          <span class="mic-icon">🎙</span>
-        </div>
-        <div class="intent-badge" id="intentBadge">
-          <svg class="conf-ring" viewBox="0 0 36 36">
-            <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3" />
-            <circle id="confArc" cx="18" cy="18" r="15" fill="none" stroke="var(--blue)" stroke-width="3"
-              stroke-dasharray="94.25" stroke-dashoffset="94.25" stroke-linecap="round" transform="rotate(-90 18 18)" />
-          </svg>
-          <span id="intentText">—</span>
-        </div>
-        <div class="toggle-group">
-          <div class="toggle-wrap">
-            <span class="toggle-label">Privacy</span>
-            <button class="toggle on" id="privacyToggle" type="button" role="switch" aria-checked="true"
-              aria-label="Privacy Mode"></button>
-          </div>
-          <div class="toggle-wrap">
-            <span class="toggle-label">Network</span>
-            <button class="toggle on" id="networkToggle" type="button" role="switch" aria-checked="true"
-              aria-label="Network Mode"></button>
-          </div>
-          <div class="toggle-wrap">
-            <span class="toggle-label">Voice</span>
-            <button class="toggle on" id="ttsToggle" type="button" role="switch" aria-checked="true"
-              aria-label="Voice Response"></button>
-          </div>
-        </div>
-        <button class="speak-btn" id="speakBtn" type="button">
-          <svg viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z" />
-          </svg> Run
-        </button>
-      </div>
-    </div>
-  </section>
-
-  <!-- Capabilities Section -->
-  <section class="scroll-section" id="capabilities-section">
-    <div class="header zoom-in">
-      <h2 style="font-size:2rem; font-weight:600; margin-bottom: 24px;">Discover Capabilities</h2>
-    </div>
-    <div class="presets zoom-in" id="presetGrid" style="animation-delay: 0.1s;">
-      <button class="preset-btn glow-surface" type="button" data-command="Set a timer for 5 minutes" data-privacy="ON"
-        data-network="ONLINE">⏱ Set a timer<small>local · timer</small></button>
-      <button class="preset-btn glow-surface" type="button" data-command="What's the weather" data-privacy="ON"
-        data-network="ONLINE">🌤 Weather<small>remote · live data</small></button>
-      <button class="preset-btn glow-surface" type="button" data-command="Play jazz on YouTube Music" data-privacy="ON"
-        data-network="ONLINE">🎵 Play music<small>remote · youtube</small></button>
-      <button class="preset-btn glow-surface" type="button" data-command="Take a screenshot" data-privacy="ON"
-        data-network="ONLINE">📸 Screenshot<small>local · capture</small></button>
-      <button class="preset-btn glow-surface" type="button" data-command="What's my battery level" data-privacy="ON"
-        data-network="ONLINE">🔋 System info<small>local · sysctl</small></button>
-      <button class="preset-btn glow-surface" type="button" data-command="Remind me to buy groceries" data-privacy="ON"
-        data-network="ONLINE">📌 Reminder<small>local · Reminders.app</small></button>
-      <button class="preset-btn glow-surface" type="button" data-command="Set a timer and play jazz" data-privacy="ON"
-        data-network="ONLINE">⛓ Multi-chain<small>timer + music</small></button>
-      <button class="preset-btn glow-surface" type="button" data-command="Search the web for restaurants"
-        data-privacy="ON" data-network="ONLINE">🔍 Web search<small>privacy test</small></button>
-    </div>
-  </section>
-
-  <!-- Pipeline Section -->
-  <section class="scroll-section" id="pipeline-section">
-    <div class="header fade-up">
-      <h2 style="font-size:2rem; font-weight:600; margin-bottom: 24px;">Live Execution Pipeline</h2>
-    </div>
-    <!-- Main Layout -->
-    <div class="main-layout fade-up" style="animation-delay: 0.1s;">
-      <div>
-        <!-- Pipeline Diagram -->
-        <div class="card">
-          <div class="panel-label">Visual Pipeline</div>
-          <div class="pipeline-wrap">
-            <svg class="pipeline-svg" viewBox="0 0 820 220" xmlns="http://www.w3.org/2000/svg">
-              <g class="stage-node idle" id="stage-invocation">
-                <rect class="stage-rect" x="5" y="10" width="140" height="60" /><text class="stage-label" x="75"
-                  y="37">INVOCATION</text><text class="stage-sub" x="75" y="52">Wake + score</text>
-              </g>
-              <line class="conn-line" id="conn-0" x1="145" y1="40" x2="195" y2="40" />
-              <polygon class="conn-arrow" id="arrow-0" points="192,36 200,40 192,44" />
-              <circle class="flow-particle" id="particle-0" cx="145" cy="40" />
-              <g class="stage-node idle" id="stage-asr">
-                <rect class="stage-rect" x="200" y="10" width="140" height="60" /><text class="stage-label" x="270"
-                  y="37">ASR</text><text class="stage-sub" x="270" y="52">Transcript</text>
-              </g>
-              <line class="conn-line" id="conn-1" x1="340" y1="40" x2="390" y2="40" />
-              <polygon class="conn-arrow" id="arrow-1" points="387,36 395,40 387,44" />
-              <circle class="flow-particle" id="particle-1" cx="340" cy="40" />
-              <g class="stage-node idle" id="stage-attention">
-                <rect class="stage-rect" x="395" y="10" width="140" height="60" /><text class="stage-label" x="465"
-                  y="37">ATTENTION</text><text class="stage-sub" x="465" y="52">Intent + conf</text>
-              </g>
-              <line class="conn-line" id="conn-2" x1="535" y1="40" x2="585" y2="40" />
-              <polygon class="conn-arrow" id="arrow-2" points="582,36 590,40 582,44" />
-              <circle class="flow-particle" id="particle-2" cx="535" cy="40" />
-              <g class="stage-node idle" id="stage-privacy">
-                <rect class="stage-rect" x="590" y="10" width="155" height="60" /><text class="stage-label" x="667"
-                  y="37">PRIVACY GATE</text><text class="stage-sub" x="667" y="52">Policy check</text>
-              </g>
-              <line class="conn-line" id="conn-3" x1="667" y1="70" x2="667" y2="140" />
-              <polygon class="conn-arrow" id="arrow-3" points="663,137 667,147 671,137" />
-              <circle class="flow-particle" id="particle-3" cx="667" cy="70" />
-              <g class="stage-node idle" id="stage-router">
-                <rect class="stage-rect" x="590" y="150" width="155" height="60" /><text class="stage-label" x="667"
-                  y="177">ROUTER</text><text class="stage-sub" x="667" y="192">Path select</text>
-              </g>
-              <line class="conn-line" id="conn-4" x1="590" y1="180" x2="540" y2="180" />
-              <polygon class="conn-arrow" id="arrow-4" points="543,176 535,180 543,184" />
-              <circle class="flow-particle" id="particle-4" cx="590" cy="180" />
-              <g class="stage-node idle" id="stage-mcp">
-                <rect class="stage-rect" x="395" y="150" width="140" height="60" /><text class="stage-label" x="465"
-                  y="177">MCP SERVER</text><text class="stage-sub" x="465" y="192">Tool call</text>
-              </g>
-              <line class="conn-line" id="conn-5" x1="395" y1="180" x2="345" y2="180" />
-              <polygon class="conn-arrow" id="arrow-5" points="348,176 340,180 348,184" />
-              <circle class="flow-particle" id="particle-5" cx="395" cy="180" />
-              <g class="stage-node idle" id="stage-execution">
-                <rect class="stage-rect" x="200" y="150" width="140" height="60" /><text class="stage-label" x="270"
-                  y="177">EXECUTION</text><text class="stage-sub" x="270" y="192">Action run</text>
-              </g>
-              <line class="conn-line" id="conn-6" x1="200" y1="180" x2="150" y2="180" />
-              <polygon class="conn-arrow" id="arrow-6" points="153,176 145,180 153,184" />
-              <circle class="flow-particle" id="particle-6" cx="200" cy="180" />
-              <g class="stage-node idle" id="stage-response">
-                <rect class="stage-rect" x="5" y="150" width="140" height="60" /><text class="stage-label" x="75"
-                  y="177">RESPONSE</text><text class="stage-sub" x="75" y="192">User output</text>
-              </g>
+    <main>
+      <div class="orb-container">
+        <button id="micBtn" type="button" aria-label="Microphone">
+            <!-- This canvas will be drawn on by the existing JS -->
+            <canvas id="micVisualizer" width="600" height="600"></canvas>
+            <svg class="mic-icon-center" viewBox="0 0 24 24">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm-1 14.93A7.01 7.01 0 0 1 5 9h2a5 5 0 0 0 10 0h2a7.01 7.01 0 0 1-6 6.93V20h4v2H7v-2h4v-4.07z" />
             </svg>
-          </div>
-          <div class="legend">
-            <span class="legend-chip"><span class="legend-dot" style="background:var(--green)"></span>Success</span>
-            <span class="legend-chip"><span class="legend-dot" style="background:var(--red)"></span>Blocked /
-              Failed</span>
-            <span class="legend-chip"><span class="legend-dot" style="background:var(--yellow)"></span>PCC
-              Route</span>
-            <span class="legend-chip"><span class="legend-dot" style="background:var(--blue)"></span>Active</span>
-          </div>
-          <div class="section-divider"></div>
-          <div class="panel-label">Stage Output</div>
-          <div class="log-panel" id="logPanel" aria-live="polite">
-            <div class="empty-state">Awaiting your first command ↑</div>
-          </div>
+        </button>
+      </div>
+
+      <div class="input-zone">
+        <label for="commandInput" class="sr-only">Command</label>
+        <input id="commandInput" type="text" placeholder="SPEAK OR TYPE..." value="Set a timer for 10 minutes" autocomplete="off">
+        <div id="intentBadge">
+          <span>INTENT:</span> <span id="intentText">—</span>
+        </div>
+      </div>
+    </main>
+
+    <div class="hud-deck">
+      <div class="hud-panel left">
+        <div id="logPanel" aria-live="polite">
+          <div class="log-line">System initialized...</div>
         </div>
       </div>
 
-      <!-- Right Column -->
-      <aside>
-        <div class="card" style="margin-bottom:24px">
-          <div class="panel-label">MCP Server Registry</div>
-          <div id="serverList" class="server-list"></div>
-        </div>
-        <div class="card">
-          <div class="panel-label">Session</div>
-          <div class="session-grid">
-            <div class="s-row"><span class="s-key">Session ID</span><span class="s-val" id="session-id"></span>
-            </div>
-            <div class="s-row"><span class="s-key">Active</span><span class="s-val" id="session-active"></span>
-            </div>
-            <div class="s-row"><span class="s-key">Turns</span><span class="s-val" id="session-turns">0</span></div>
-            <div class="s-row"><span class="s-key">Last entity</span><span class="s-val" id="session-entity">none</span>
-            </div>
-            <div class="s-row"><span class="s-key">Expires in</span><span class="s-val" id="session-expiry">0s</span>
-            </div>
+      <div class="hud-panel center">
+         <div class="controls-row">
+           <div>
+             <button class="toggle on" id="privacyToggle" type="button" role="switch" aria-checked="true"></button>
+             <div class="control-label">Privacy</div>
+           </div>
+           <div>
+             <button class="toggle on" id="networkToggle" type="button" role="switch" aria-checked="true"></button>
+             <div class="control-label">Network</div>
+           </div>
+           <div>
+            <button class="toggle on" id="ttsToggle" type="button" role="switch" aria-checked="true"></button>
+            <div class="control-label">Voice</div>
           </div>
-        </div>
-      </aside>
-    </div>
-  </section>
+         </div>
+         <button id="speakBtn" type="button">EXECUTE RUN</button>
 
-  <!-- Analytics Dashboard -->
-  <section class="scroll-section analytics-section" id="analyticsSection">
-    <div class="header fade-up">
-      <h2 style="font-size:2rem; font-weight:600; margin-bottom: 24px;">Pipeline Insights</h2>
-    </div>
+         <!-- HUD Pipeline Visualizer -->
+         <div class="pipeline-hud" style="margin-top: 1rem;">
+           <div class="hud-stage" id="hud-invocation">INVOKE</div>
+           <div class="hud-stage" id="hud-asr">ASR</div>
+           <div class="hud-stage" id="hud-attention">ATTN</div>
+           <div class="hud-stage" id="hud-privacy">PRIV</div>
+           <div class="hud-stage" id="hud-router">ROUTE</div>
+           <div class="hud-stage" id="hud-mcp">MCP</div>
+           <div class="hud-stage" id="hud-execution">EXEC</div>
+           <div class="hud-stage" id="hud-response">RESP</div>
+         </div>
+      </div>
 
-    <!-- Metric cards -->
-    <div class="metrics-grid fade-up" id="metricsGrid" style="animation-delay: 0.1s;">
-      <div class="metric-card glow-surface">
-        <div class="metric-value blue" id="m-total">0</div>
-        <div class="metric-label">Total Runs</div>
-        <div class="metric-sub" id="m-rate">—</div>
-      </div>
-      <div class="metric-card glow-surface">
-        <div class="metric-value green" id="m-success">—</div>
-        <div class="metric-label">Success Rate</div>
-        <div class="metric-sub" id="m-success-n">0 succeeded</div>
-      </div>
-      <div class="metric-card glow-surface">
-        <div class="metric-value yellow" id="m-conf">—</div>
-        <div class="metric-label">Avg Confidence</div>
-        <div class="metric-sub" id="m-conf-range">—</div>
-      </div>
-      <div class="metric-card glow-surface">
-        <div class="metric-value purple" id="m-latency">—</div>
-        <div class="metric-label">Avg Latency</div>
-        <div class="metric-sub" id="m-latency-range">—</div>
-      </div>
-    </div>
-
-    <!-- Percentile bars -->
-    <div class="percentile-row" id="percentileRow">
-      <div class="pctl-card glow-surface">
-        <div class="pctl-label">P50 Latency</div>
-        <div class="pctl-value" id="p50">—</div>
-        <div class="pctl-bar" id="p50bar" style="width:0; background:var(--green)"></div>
-      </div>
-      <div class="pctl-card glow-surface">
-        <div class="pctl-label">P90 Latency</div>
-        <div class="pctl-value" id="p90">—</div>
-        <div class="pctl-bar" id="p90bar" style="width:0; background:var(--yellow)"></div>
-      </div>
-      <div class="pctl-card glow-surface">
-        <div class="pctl-label">P99 Latency</div>
-        <div class="pctl-value" id="p99">—</div>
-        <div class="pctl-bar" id="p99bar" style="width:0; background:var(--red)"></div>
-      </div>
-    </div>
-
-    <!-- Charts + Intent distribution -->
-    <div class="analytics-panels">
-      <div class="analytics-sub-card glow-surface">
-        <div class="sub-title">Latency Trend</div>
-        <canvas id="sparkCanvas" height="64"></canvas>
-      </div>
-      <div class="analytics-sub-card glow-surface">
-        <div class="sub-title">Intent Distribution</div>
-        <div id="intentBreakdown">
-          <div class="empty-state">No data yet</div>
+      <div class="hud-panel right">
+        <div id="presetGrid">
+          <button class="preset-btn" type="button" data-command="Set a timer for 5 minutes" data-privacy="ON" data-network="ONLINE">⏱ Timer 5m</button>
+          <button class="preset-btn" type="button" data-command="What's the weather" data-privacy="ON" data-network="ONLINE">🌤 Weather</button>
+          <button class="preset-btn" type="button" data-command="Play jazz on YouTube Music" data-privacy="ON" data-network="ONLINE">🎵 Music</button>
+          <button class="preset-btn" type="button" data-command="Take a screenshot" data-privacy="ON" data-network="ONLINE">📸 Screenshot</button>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Request history -->
-    <div class="card">
-      <div class="panel-label">Request History</div>
-      <div class="history-scroll">
-        <table class="history-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Command</th>
-              <th>Intent</th>
-              <th>Confidence</th>
-              <th>Route</th>
-              <th>Latency</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="historyBody">
-            <tr>
-              <td colspan="7" class="empty-state">No requests yet — run a command above</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-    </div>
-    </div>
+  <script>
+    // HUD Sync Logic (New)
+    (function() {
+      const stages = ['invocation', 'asr', 'attention', 'privacy', 'router', 'mcp', 'execution', 'response'];
 
-    <script>
+      // Since the original JS modifies classes on the hidden elements, we can just poll them or proxy the function.
+      // But we can't easily proxy the internal function of the closure.
+      // So we use MutationObserver on the legacy container.
+
+      const legacy = document.getElementById('legacy-container');
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+           if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+             const id = mutation.target.id;
+             if (id && id.startsWith('stage-')) {
+               const stageName = id.replace('stage-', '');
+               const hudEl = document.getElementById('hud-' + stageName);
+               if (hudEl) {
+                 hudEl.className = 'hud-stage ' + mutation.target.className; // Sync classes
+                 // Remove 'idle' or map it
+                 if (hudEl.classList.contains('idle')) {
+                    hudEl.classList.remove('idle'); // Default style is idle
+                 }
+               }
+             }
+           }
+        });
+      });
+
+      stages.forEach(s => {
+        const el = document.getElementById('stage-' + s);
+        if (el) observer.observe(el, { attributes: true });
+      });
+
+      // Also sync session turns/status to header
+      const turnObs = new MutationObserver(() => {
+        const turns = document.getElementById('session-turns').textContent;
+        document.getElementById('status-readout').textContent = 'Session Active · Turn ' + turns;
+      });
+      const turnEl = document.getElementById('session-turns');
+      if (turnEl) turnObs.observe(turnEl, { characterData: true, childList: true, subtree: true });
+
+    })();
+  </script>
+
+  <!-- Original Logic -->
+  <script>
+
       (function () {
         /* ── Boot sequence ─── */
         const boot = document.getElementById('bootOverlay');
@@ -2783,7 +1341,7 @@
         // Bug 7 fix: also escape single quotes for defense-in-depth XSS protection
         function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
       })();
-    </script>
-</body>
 
+  </script>
+</body>
 </html>
