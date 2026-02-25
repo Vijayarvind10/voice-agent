@@ -4,6 +4,7 @@ FastAPI + WebSocket with 13 MCP servers, TTS, multi-command chaining, conversati
 """
 
 import asyncio, json, subprocess, re, random, string, urllib.parse, os, platform
+from collections import deque
 from datetime import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -90,7 +91,8 @@ SERVERS = [
 ]
 
 # ── Conversation Memory ──────────────────────────────────────────────
-conversation_history = []  # [{turn, command, intent, response, timestamp}]
+# Using deque for O(1) pops when history is full
+conversation_history = deque(maxlen=20)  # [{turn, command, intent, response, timestamp}]
 MAX_HISTORY = 20
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -422,7 +424,7 @@ async def execute(plan: dict) -> dict:
 
     if intent == "RECALL_HISTORY":
         if conversation_history:
-            recent = conversation_history[-3:]
+            recent = list(conversation_history)[-3:]
             summary = " → ".join([h["intent"] for h in recent])
             return {"log": f"history · {len(conversation_history)} turns", "entityId": f"hist_{uid()}",
                     "response": f"Recent: {summary}"}
@@ -772,8 +774,6 @@ async def websocket_endpoint(ws: WebSocket):
                     "response": result["response"],
                     "timestamp": datetime.now().isoformat()
                 })
-                if len(conversation_history) > MAX_HISTORY:
-                    conversation_history.pop(0)
 
                 if is_chain and ci < len(commands) - 1:
                     await asyncio.sleep(0.3)
@@ -794,8 +794,8 @@ def get_servers():
     return SERVERS
 
 @app.get("/history")
-def get_history():
-    return conversation_history[-10:]
+async def get_history():
+    return list(conversation_history)[-10:]
 
 @app.get("/")
 def root():
