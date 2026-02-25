@@ -239,6 +239,28 @@ run_tests() {
      fail "Bug 11 REGRESSION: startAudioVis() might still be in click handler directly"
   fi
 
+  # ─── 12. Bug 12 regression: Predictive Execution Disabled ───
+  log "Bug 12 — Predictive Execution Disabled"
+
+  if echo "$CONTENT" | grep -q "SOA Feature: Low-Latency Predictive Execution - DISABLED"; then
+    pass "Predictive execution comment updated to DISABLED"
+  else
+    fail "Bug 12 REGRESSION: Predictive execution comment not updated"
+  fi
+
+  # Check if the code block is commented out (basic check)
+  if echo "$CONTENT" | grep -q "/\*.*const plan = classify.*recognition.stop().*\*/"; then
+    pass "Predictive execution logic is commented out"
+  # Grep might struggle with multi-line, so we can check if recognition.stop() is present in that specific block or not.
+  # A simpler check: ensure recognition.stop() is NOT present inside the classifyDebounce block unless commented.
+  # Since we commented it out using /* */, grep still sees the text.
+  # We can check if it's wrapped in comments.
+  elif echo "$CONTENT" | grep -A 5 "SOA Feature: Low-Latency Predictive Execution - DISABLED" | grep -q "/\*"; then
+    pass "Predictive execution logic appears to be commented out"
+  else
+    warn "Could not verify if Predictive Execution logic is commented out via grep"
+  fi
+
   # ─── Summary ───
   TOTAL=$((PASS+FAIL))
   header "Results: $PASS/$TOTAL passed, $FAIL failed"

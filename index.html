@@ -2066,12 +2066,14 @@
               classifyDebounce = setTimeout(() => {
                 updateIntentBadge(interim);
 
-                // SOA Feature: Low-Latency Predictive Execution
-                // If we match an intent with high confidence and it's not missing slots, trigger early
+                // SOA Feature: Low-Latency Predictive Execution - DISABLED
+                // Users reported it cutting off too early. Relying on natural speech end instead.
+                /*
                 const plan = classify(normalise(interim));
                 if (plan.supported && plan.intent !== 'MISSING_SLOT' && plan.confidence >= 0.94) {
                   recognition.stop(); // Force early completion
                 }
+                */
               }, 200);
             }
           };
