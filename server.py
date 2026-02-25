@@ -12,7 +12,21 @@ from fastapi.responses import FileResponse
 import uvicorn
 
 app = FastAPI(title="Real Time Voice MCP")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+# Restricted CORS origins for security - allow only local development origins
+ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ── MCP Server Registry ──────────────────────────────────────────────
 SERVERS = [
