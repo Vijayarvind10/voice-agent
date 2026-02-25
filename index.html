@@ -798,6 +798,15 @@
       cursor: not-allowed
     }
 
+    .speak-btn:disabled.processing {
+      opacity: 0.8;
+      cursor: wait;
+    }
+
+    .spinner-icon {
+      animation: spin 1s linear infinite;
+    }
+
     .speak-btn svg {
       width: 14px;
       height: 14px;
@@ -2271,6 +2280,10 @@
             await sleep(200); // let the old run exit
             running = false;
           }
+          // UX: Loading state
+          dom.speak.innerHTML = '<svg class="spinner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10" stroke-opacity="0.2"></circle><path d="M12 2a10 10 0 0 1 10 10" stroke-opacity="1"></path></svg> Running...';
+          dom.speak.classList.add('processing');
+
           running = true; setDisabled(true); runCounter++; completedStages = 0;
           pipelineStartTime = performance.now();
           currentRunMeta = { cmd, intent: 'UNKNOWN', confidence: 0, routeType: 'none', succeeded: false };
@@ -2584,6 +2597,10 @@
           }
           currentRunMeta = null;
           running = false; setDisabled(false);
+          // UX: Reset loading state
+          dom.speak.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg> Run';
+          dom.speak.classList.remove('processing');
+
           // Bug 2 fix: respect session.active state for live dot
           if (session.active) dom.liveDot.classList.remove('off');
           else dom.liveDot.classList.add('off');
