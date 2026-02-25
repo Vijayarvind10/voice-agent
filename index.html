@@ -44,6 +44,8 @@
       --yellow-glow: rgba(238, 191, 100, .14);
       --red-glow: rgba(224, 108, 108, .16);
       --purple-glow: rgba(167, 139, 219, .14);
+      --aurora-1: rgba(123, 155, 244, .4);
+      --aurora-2: rgba(167, 139, 219, .35);
       /* ── Surfaces ── */
       --glass: rgba(255, 255, 255, .035);
       --glass-border: rgba(255, 255, 255, .07);
@@ -154,19 +156,36 @@
     .aurora::before {
       width: 600px;
       height: 600px;
-      background: radial-gradient(circle, rgba(123, 155, 244, .4), transparent 70%);
+      background: radial-gradient(circle, var(--aurora-1), transparent 70%);
       top: -10%;
       left: -5%;
+      transition: background 1.5s var(--ease);
     }
 
     .aurora::after {
       width: 500px;
       height: 500px;
-      background: radial-gradient(circle, rgba(167, 139, 219, .35), transparent 70%);
+      background: radial-gradient(circle, var(--aurora-2), transparent 70%);
       bottom: -15%;
       right: -5%;
       animation-delay: -6s;
       animation-duration: 22s;
+      transition: background 1.5s var(--ease);
+    }
+
+    .aurora.active {
+      --aurora-1: rgba(123, 155, 244, .6);
+      --aurora-2: rgba(90, 216, 160, .5);
+    }
+
+    .aurora.success {
+      --aurora-1: rgba(90, 216, 160, .6);
+      --aurora-2: rgba(123, 155, 244, .5);
+    }
+
+    .aurora.error {
+      --aurora-1: rgba(224, 108, 108, .6);
+      --aurora-2: rgba(238, 191, 100, .5);
     }
 
     .aurora-accent {
@@ -860,11 +879,23 @@
       pointer-events: none
     }
 
+    @keyframes flow {
+      to {
+        stroke-dashoffset: -20;
+      }
+    }
+
     .conn-line {
       stroke: rgba(255, 255, 255, .04);
       stroke-width: 1.5;
       fill: none;
-      transition: stroke .35s
+      transition: stroke .35s;
+    }
+
+    .conn-line.flowing {
+      stroke-dasharray: 6 4;
+      animation: flow 0.5s linear infinite;
+      stroke-width: 2;
     }
 
     .conn-arrow {
@@ -1920,8 +1951,23 @@
           document.querySelectorAll('.glow-surface, .card').forEach(el => {
             el.addEventListener('mousemove', e => {
               const rect = el.getBoundingClientRect();
-              el.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
-              el.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+              const x = e.clientX - rect.left;
+              const y = e.clientY - rect.top;
+              el.style.setProperty('--mouse-x', `${x}px`);
+              el.style.setProperty('--mouse-y', `${y}px`);
+
+              if (el.classList.contains('card') || el.classList.contains('preset-btn')) {
+                 const centerX = rect.width / 2;
+                 const centerY = rect.height / 2;
+                 const rotX = ((y - centerY) / centerY) * -3; // Max 3deg tilt
+                 const rotY = ((x - centerX) / centerX) * 3;
+                 el.style.transform = `perspective(1000px) rotateX(${rotX}deg) rotateY(${rotY}deg) scale3d(1.01, 1.01, 1.01)`;
+              }
+            });
+            el.addEventListener('mouseleave', () => {
+               if (el.classList.contains('card') || el.classList.contains('preset-btn')) {
+                  el.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1)';
+               }
             });
           });
         }
@@ -2157,17 +2203,22 @@
           analyser.getByteFrequencyData(data);
           const w = dom.micVis.width, h = dom.micVis.height, cx = w / 2, cy = h / 2;
           visCtx.clearRect(0, 0, w, h);
-          const bars = 24, step = (Math.PI * 2) / bars;
-          for (let i = 0; i < bars; i++) {
-            const val = (data[i % data.length] || 0) / 255;
-            const len = 6 + val * 14;
-            const angle = i * step - Math.PI / 2;
-            const r1 = Math.min(w, h) * 0.3, r2 = r1 + len;
+          const time = Date.now() * 0.003;
+          for (let j = 0; j < 3; j++) {
             visCtx.beginPath();
-            visCtx.moveTo(cx + Math.cos(angle) * r1, cy + Math.sin(angle) * r1);
-            visCtx.lineTo(cx + Math.cos(angle) * r2, cy + Math.sin(angle) * r2);
-            visCtx.strokeStyle = `rgba(10,132,255,${0.4 + val * 0.6})`;
-            visCtx.lineWidth = 2; visCtx.lineCap = 'round'; visCtx.stroke();
+            const count = 30;
+            for (let i = 0; i <= count; i++) {
+              const angle = (i / count) * Math.PI * 2;
+              const dIdx = Math.floor((i / count) * data.length * 0.5);
+              const val = (data[dIdx] || 0) / 255;
+              const r = 18 + val * 14 + Math.sin(angle * 3 + time + j) * 3;
+              const x = cx + Math.cos(angle) * r;
+              const y = cy + Math.sin(angle) * r;
+              if (i === 0) visCtx.moveTo(x, y); else visCtx.lineTo(x, y);
+            }
+            visCtx.closePath();
+            visCtx.fillStyle = `rgba(${100+j*50}, ${150+j*30}, 255, 0.3)`;
+            visCtx.fill();
           }
           visRAF = requestAnimationFrame(drawVis);
         }
@@ -2328,6 +2379,7 @@
           session.turns++; session.expiresIn = 95; session.active = true;
           renderSession(); updateProgress(-1);
           dom.liveDot.classList.remove('off');
+          document.querySelector('.aurora').className = 'aurora active';
           addLog('SYSTEM', 'Turn ' + session.turns + ' started.', 'ok', false);
           updateIntentBadge(cmd);
 
@@ -2403,6 +2455,7 @@
         }
 
         async function failFrom(startIdx, rid, reason) {
+          document.querySelector('.aurora').className = 'aurora error';
           const remaining = STAGE_IDS.slice(startIdx);
           for (let i = 0; i < remaining.length; i++) {
             const gi = startIdx + i;
@@ -2435,6 +2488,7 @@
           const p = dom.particles[i], line = dom.conns[i];
           const x1 = +line.getAttribute('x1'), y1 = +line.getAttribute('y1'), x2 = +line.getAttribute('x2'), y2 = +line.getAttribute('y2');
           p.setAttribute('cx', x1); p.setAttribute('cy', y1); p.classList.add('running');
+          dom.conns[i].classList.add('flowing');
           const dur = 200, start = performance.now();
           function tick(now) {
             const t = Math.min((now - start) / dur, 1);
@@ -2613,9 +2667,10 @@
         }
         function statusClass(s) { return s === 'ok' ? 'success' : s === 'err' ? 'error' : s === 'pcc' ? 'pcc' : 'idle'; }
         function resetAll() {
+          document.querySelector('.aurora').className = 'aurora';
           STAGE_IDS.forEach(id => setStage(id, 'idle'));
           // Bug 1 fix: use setAttribute for reliable SVG class handling
-          for (let i = 0; i <= 6; i++) { dom.conns[i].setAttribute('class', 'conn-line'); dom.arrows[i].setAttribute('class', 'conn-arrow'); dom.particles[i].classList.remove('running'); }
+          for (let i = 0; i <= 6; i++) { dom.conns[i].setAttribute('class', 'conn-line'); dom.conns[i].classList.remove('flowing'); dom.arrows[i].setAttribute('class', 'conn-arrow'); dom.particles[i].classList.remove('running'); }
           dom.idProgress.querySelectorAll('.prog-step').forEach(s => s.className = 'prog-step');
           dom.stageCount.textContent = '0 / 8 stages';
         }
@@ -2672,6 +2727,9 @@
           const latMs = performance.now() - pipelineStartTime;
           if (currentRunMeta && currentRunMeta.cmd) {
             recordRun(currentRunMeta.cmd, currentRunMeta.intent, currentRunMeta.confidence, currentRunMeta.routeType, latMs, currentRunMeta.succeeded);
+            const status = currentRunMeta.succeeded ? 'success' : 'error';
+            document.querySelector('.aurora').className = 'aurora ' + status;
+            setTimeout(() => { document.querySelector('.aurora').className = 'aurora'; }, 2000);
           }
           currentRunMeta = null;
           running = false; setDisabled(false);
