@@ -1,0 +1,343 @@
+[
+  {
+    "id": "SET_TIMER",
+    "triggers": ["timer|countdown|alarm"],
+    "extraction": {
+        "duration_regex": "(\\d+)\\s*(minute|min|second|sec|hour|hr)",
+        "numeric_regex": "^(\\d+)$"
+    },
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.apple.timer.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.96
+    }
+  },
+  {
+    "id": "REPEAT_LAST",
+    "triggers": ["do that again|repeat|again|redo"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.apple.clipboard.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.95
+    }
+  },
+  {
+    "id": "RECALL_HISTORY",
+    "triggers": ["what did i|last command|history|what was"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.apple.clipboard.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.93
+    }
+  },
+  {
+    "id": "PLAY_MUSIC",
+    "triggers": ["youtube|music|jazz|song|play|spotify"],
+    "extraction": {
+        "removal_regex": "(play|on youtube music|on youtube|on spotify)"
+    },
+    "properties": {
+      "supported": true,
+      "routeType": "remote",
+      "servers": ["com.google.youtubemusic"],
+      "privacyClass": "remote_media",
+      "confidence": 0.93
+    }
+  },
+  {
+    "id": "GET_WEATHER",
+    "triggers": ["weather|temperature|forecast|rain|sunny"],
+    "extraction": {
+        "location_regex": "(?:in|at|for)\\s+(.+)"
+    },
+    "properties": {
+      "supported": true,
+      "routeType": "remote",
+      "servers": ["com.apple.weather.mcp"],
+      "privacyClass": "remote_data",
+      "confidence": 0.94
+    }
+  },
+  {
+    "id": "TAKE_SCREENSHOT",
+    "triggers": ["screenshot|screen\\s*cap|capture\\s*(the\\s*)?screen|snap"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.apple.screenshot.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.95
+    }
+  },
+  {
+    "id": "CLIPBOARD",
+    "triggers": ["clipboard|paste|what.*copied|copy that"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.apple.clipboard.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.92
+    }
+  },
+  {
+    "id": "SYSTEM_INFO",
+    "triggers": ["battery|cpu|memory|ram|disk|system\\s*info|storage"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.apple.systeminfo.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.94
+    }
+  },
+  {
+    "id": "VOLUME_CONTROL",
+    "triggers": ["volume|mute|unmute|louder|quieter|sound"],
+    "extraction": {
+        "level_regex": "(\\d+)",
+        "mute_regex": "mute",
+        "unmute_regex": "unmute"
+    },
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.apple.volume.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.93
+    }
+  },
+  {
+    "id": "CREATE_NOTE",
+    "triggers": ["(create|make|write|add)\\s*(a\\s*)?note"],
+    "extraction": {
+        "body_removal_regex": "(create|make|write|add)\\s*(a\\s*)?note\\s*(saying|that says|with)?\\s*"
+    },
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.apple.notes.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.91
+    }
+  },
+  {
+    "id": "CREATE_REMINDER",
+    "triggers": ["remind|reminder"],
+    "extraction": {
+        "body_removal_regex": "(remind me to|set a reminder to|add a reminder to|remind me)\\s*"
+    },
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.apple.reminders.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.92
+    }
+  },
+  {
+    "id": "OPEN_FINDER",
+    "triggers": ["(open|show)\\s*(the\\s*)?(downloads?|documents?|desktop|home|finder|folder)"],
+    "extraction": {
+        "folder_regex": "(downloads?|documents?|desktop|home|finder)"
+    },
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.apple.finder.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.93
+    }
+  },
+  {
+    "id": "FOLLOWUP_FROM_MESSAGE",
+    "triggers": ["message", "follow-up|follow up|meeting|calendar"],
+    "properties": {
+      "supported": true,
+      "routeType": "pcc",
+      "servers": ["com.apple.messages.mcp", "com.apple.calendar.mcp"],
+      "privacyClass": "cross_context_local",
+      "confidence": 0.91
+    }
+  },
+  {
+    "id": "WEB_SEARCH",
+    "triggers": ["search|google|look up"],
+    "extraction": {
+        "query_removal_regex": "(search|the web|for|on google|on the internet|google|look up)"
+    },
+    "properties": {
+      "supported": true,
+      "routeType": "remote",
+      "servers": ["com.apple.websearch.mcp"],
+      "privacyClass": "external_search",
+      "confidence": 0.90
+    }
+  },
+  {
+    "id": "OPEN_MAPS",
+    "triggers": ["map|direction|navigate|where is"],
+    "extraction": {
+        "query_removal_regex": "(open maps? to|show me|navigate to|directions? to|where is)"
+    },
+    "properties": {
+      "supported": true,
+      "routeType": "remote",
+      "servers": ["com.apple.maps.mcp"],
+      "privacyClass": "remote_data",
+      "confidence": 0.92
+    }
+  },
+  {
+    "id": "SEND_MESSAGE",
+    "triggers": ["send.*(message|text|imessage)"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.apple.messages.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.89
+    }
+  },
+  {
+    "id": "CREATE_EVENT",
+    "triggers": ["(create|add|schedule|new).*(event|meeting|appointment)"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.apple.calendar.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.90
+    }
+  },
+  {
+    "id": "OPEN_APP",
+    "triggers": ["open\\s+(\\w+)"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.apple.finder.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.88
+    }
+  },
+  {
+    "id": "GET_DATE_TIME",
+    "triggers": ["\\btime\\b|date|day is it"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.apple.clock.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.96
+    }
+  },
+  {
+    "id": "CALCULATE",
+    "triggers": ["calculate|math|plus|minus|times|divided"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.apple.calculator.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.95
+    }
+  },
+  {
+    "id": "TELL_JOKE",
+    "triggers": ["joke|laugh"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.entertainment.jokes.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.92
+    }
+  },
+  {
+    "id": "GET_QUOTE",
+    "triggers": ["quote|inspire|wisdom|motivation"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.entertainment.quotes.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.91
+    }
+  },
+  {
+    "id": "FLIP_COIN",
+    "triggers": ["flip.*coin|heads.*tails"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.tools.random.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.94
+    }
+  },
+  {
+    "id": "ROLL_DIE",
+    "triggers": ["roll.*(die|dice)"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.tools.random.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.94
+    }
+  },
+  {
+    "id": "DEFINE_WORD",
+    "triggers": ["define|meaning of|definition"],
+    "extraction": {
+        "word_removal_regex": "(define|meaning of|definition of|what is the)\\s*"
+    },
+    "properties": {
+      "supported": true,
+      "routeType": "remote",
+      "servers": ["com.reference.dictionary.mcp"],
+      "privacyClass": "external_search",
+      "confidence": 0.92
+    }
+  },
+  {
+    "id": "CONVERT_CURRENCY",
+    "triggers": ["convert.*(currency|usd|eur|gbp|yen)|price of"],
+    "properties": {
+      "supported": true,
+      "routeType": "remote",
+      "servers": ["com.finance.currency.mcp"],
+      "privacyClass": "external_search",
+      "confidence": 0.90
+    }
+  },
+  {
+    "id": "GET_IP",
+    "triggers": ["my ip|ip address"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.network.ip.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.95
+    }
+  },
+  {
+    "id": "GET_UPTIME",
+    "triggers": ["uptime|how long.*running"],
+    "properties": {
+      "supported": true,
+      "routeType": "local",
+      "servers": ["com.system.uptime.mcp"],
+      "privacyClass": "local_safe",
+      "confidence": 0.93
+    }
+  }
+]
