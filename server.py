@@ -60,6 +60,23 @@ RE_MAPS_QUERY = re.compile(r'(open maps? to|show me|navigate to|directions? to|w
 RE_SEND_MSG = re.compile(r'send.*(message|text|imessage)')
 RE_CREATE_EVENT = re.compile(r'(create|add|schedule|new).*(event|meeting|appointment)')
 RE_OPEN_APP = re.compile(r'open\s+(\w+)')
+RE_DATE_TIME = re.compile(r'\btime\b|date|day is it')
+RE_CALCULATE = re.compile(r'calculate|math|plus|minus|times|divided')
+RE_JOKE = re.compile(r'joke|laugh')
+RE_QUOTE = re.compile(r'quote|inspire|wisdom|motivation')
+RE_FLIP_COIN = re.compile(r'flip.*coin|heads.*tails')
+RE_ROLL_DIE = re.compile(r'roll.*(die|dice)')
+RE_DEFINE_WORD = re.compile(r'define|meaning of|definition')
+RE_CONVERT_CURRENCY = re.compile(r'convert.*(currency|usd|eur|gbp|yen)|price of')
+RE_GET_IP = re.compile(r'my ip|ip address')
+RE_GET_UPTIME = re.compile(r'uptime|how long.*running')
+RE_BATTERY_PCT = re.compile(r'(\d+)%')
+RE_IP_INET = re.compile(r'inet (\d+\.\d+\.\d+\.\d+)')
+RE_TTS_CLEAN = re.compile(r'[^\w\s.,!?\'-]')
+RE_WHITESPACE = re.compile(r'\s+')
+RE_SPLIT_COMMANDS = re.compile(r'\s+(?:and then|and also|and|then|also)\s+', flags=re.IGNORECASE)
+RE_CALC_CLEAN = re.compile(r'[^\d+\-*/().]')
+RE_DEFINE_WORD_CLEAN = re.compile(r'(define|meaning of|definition of|what is the)\s*')
 
 
 # ── MCP Server Registry ──────────────────────────────────────────────
@@ -101,7 +118,7 @@ def wake_score(cmd: str) -> float:
     return min(0.98, 0.91 + (len(cmd) % 5) * 0.01)
 
 def normalise(s: str) -> str:
-    c = re.sub(r'\s+', ' ', s.strip())
+    c = RE_WHITESPACE.sub(' ', s.strip())
     return c[0].lower() + c[1:] if c else ""
 
 def escape_osascript(s: str) -> str:
@@ -142,7 +159,7 @@ def speak(text: str):
     """TTS via macOS say command (non-blocking)."""
     global tts_process
     kill_tts() # Stop any ongoing speech before starting a new one
-    clean = re.sub(r'[^\w\s.,!?\'-]', '', text)[:200]
+    clean = RE_TTS_CLEAN.sub('', text)[:200]
     tts_process = subprocess.Popen(["say", "-v", "Samantha", clean])
 
 
@@ -307,62 +324,62 @@ def classify(text: str, session_state: dict = None) -> dict:
                 "privacyClass": "local_safe", "params": {"app": app_name}}
 
     # Date & Time
-    if re.search(r'\btime\b|date|day is it', t):
+    if RE_DATE_TIME.search(t):
         return {"supported": True, "intent": "GET_DATE_TIME", "confidence": 0.96,
                 "routeType": "local", "servers": ["com.apple.clock.mcp"],
                 "privacyClass": "local_safe", "params": {}}
 
     # Calculator
-    if re.search(r'calculate|math|plus|minus|times|divided', t):
+    if RE_CALCULATE.search(t):
         return {"supported": True, "intent": "CALCULATE", "confidence": 0.95,
                 "routeType": "local", "servers": ["com.apple.calculator.mcp"],
                 "privacyClass": "local_safe", "params": {"expression": t}}
 
     # Joke
-    if re.search(r'joke|laugh', t):
+    if RE_JOKE.search(t):
         return {"supported": True, "intent": "TELL_JOKE", "confidence": 0.92,
                 "routeType": "local", "servers": ["com.entertainment.jokes.mcp"],
                 "privacyClass": "local_safe", "params": {}}
 
     # Quote
-    if re.search(r'quote|inspire|wisdom|motivation', t):
+    if RE_QUOTE.search(t):
         return {"supported": True, "intent": "GET_QUOTE", "confidence": 0.91,
                 "routeType": "local", "servers": ["com.entertainment.quotes.mcp"],
                 "privacyClass": "local_safe", "params": {}}
 
     # Coin Flip
-    if re.search(r'flip.*coin|heads.*tails', t):
+    if RE_FLIP_COIN.search(t):
         return {"supported": True, "intent": "FLIP_COIN", "confidence": 0.94,
                 "routeType": "local", "servers": ["com.tools.random.mcp"],
                 "privacyClass": "local_safe", "params": {}}
 
     # Dice Roll
-    if re.search(r'roll.*(die|dice)', t):
+    if RE_ROLL_DIE.search(t):
         return {"supported": True, "intent": "ROLL_DIE", "confidence": 0.94,
                 "routeType": "local", "servers": ["com.tools.random.mcp"],
                 "privacyClass": "local_safe", "params": {}}
 
     # Dictionary
-    if re.search(r'define|meaning of|definition', t):
-        word = re.sub(r'(define|meaning of|definition of|what is the)\s*', '', t).strip()
+    if RE_DEFINE_WORD.search(t):
+        word = RE_DEFINE_WORD_CLEAN.sub('', t).strip()
         return {"supported": True, "intent": "DEFINE_WORD", "confidence": 0.92,
                 "routeType": "remote", "servers": ["com.reference.dictionary.mcp"],
                 "privacyClass": "external_search", "params": {"word": word}}
 
     # Currency
-    if re.search(r'convert.*(currency|usd|eur|gbp|yen)|price of', t):
+    if RE_CONVERT_CURRENCY.search(t):
         return {"supported": True, "intent": "CONVERT_CURRENCY", "confidence": 0.90,
                 "routeType": "remote", "servers": ["com.finance.currency.mcp"],
                 "privacyClass": "external_search", "params": {"query": t}}
 
     # Local IP
-    if re.search(r'my ip|ip address', t):
+    if RE_GET_IP.search(t):
         return {"supported": True, "intent": "GET_IP", "confidence": 0.95,
                 "routeType": "local", "servers": ["com.network.ip.mcp"],
                 "privacyClass": "local_safe", "params": {}}
 
     # Uptime
-    if re.search(r'uptime|how long.*running', t):
+    if RE_GET_UPTIME.search(t):
         return {"supported": True, "intent": "GET_UPTIME", "confidence": 0.93,
                 "routeType": "local", "servers": ["com.system.uptime.mcp"],
                 "privacyClass": "local_safe", "params": {}}
@@ -453,14 +470,14 @@ def execute(plan: dict) -> dict:
 
     if intent == "SYSTEM_INFO":
         battery = run_cmd(["pmset", "-g", "batt"])
-        bat_match = re.search(r'(\d+)%', battery)
+        bat_match = RE_BATTERY_PCT.search(battery)
         bat_pct = bat_match.group(1) + "%" if bat_match else "N/A"
         mem = run_cmd(["sysctl", "-n", "hw.memsize"])
         try: mem_gb = f"{int(mem) / (1024**3):.0f}GB"
         except: mem_gb = "N/A"
         cpu = run_cmd(["sysctl", "-n", "machdep.cpu.brand_string"])
         disk = run_cmd(["df", "-h", "/"])
-        disk_match = re.search(r'(\d+)%', disk)
+        disk_match = RE_BATTERY_PCT.search(disk)
         disk_used = disk_match.group(0) if disk_match else "N/A"
         return {"log": "sysinfo · fetched", "entityId": f"sys_{uid()}",
                 "response": f"Battery: {bat_pct} · RAM: {mem_gb} · CPU: {cpu[:40]} · Disk: {disk_used} used"}
@@ -555,7 +572,7 @@ def execute(plan: dict) -> dict:
         # Replace common words with operators
         expr = expr.lower().replace("plus", "+").replace("minus", "-").replace("times", "*").replace("divided by", "/").replace("over", "/")
         # Very basic sanitization
-        clean_expr = re.sub(r'[^\d+\-*/().]', '', expr)
+        clean_expr = RE_CALC_CLEAN.sub('', expr)
         try:
             # pylint: disable=eval-used
             res = eval(clean_expr, {"__builtins__": None}, {})
@@ -606,7 +623,7 @@ def execute(plan: dict) -> dict:
             # This works on macOS/Linux usually
             ip = run_cmd(["ifconfig"])
             # Extract first non-loopback IP for demo (very rough regex)
-            m = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', ip)
+            m = RE_IP_INET.search(ip)
             my_ip = m.group(1) if m else "127.0.0.1"
             if my_ip == "127.0.0.1":
                 # Try another way
@@ -626,7 +643,7 @@ def execute(plan: dict) -> dict:
 # ── Multi-Command Splitter ────────────────────────────────────────────
 def split_commands(text: str) -> list:
     """Split "do X and then Y" into multiple commands."""
-    parts = re.split(r'\s+(?:and then|and also|and|then|also)\s+', text, flags=re.IGNORECASE)
+    parts = RE_SPLIT_COMMANDS.split(text)
     return [p.strip() for p in parts if p.strip()]
 
 
