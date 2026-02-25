@@ -334,9 +334,9 @@
     <svg id="confArc"></svg> <!-- Hidden arc -->
   </div>
 
-  <div class="app-container">
+  <div class="app-container app">
     <header>
-      <div class="subtitle">System Online</div>
+      <div class="subtitle">System Online · <span id="server-count">Init...</span></div>
       <h1 class="mega-title">Voice MCP</h1>
       <div class="subtitle" id="status-readout">Ready for Input</div>
     </header>
@@ -1137,13 +1137,17 @@
         function renderServers() {
           const online = getNetwork() === 'ONLINE';
           dom.serverList.innerHTML = '';
+          let activeCount = 0;
           SERVERS.forEach(s => {
             const on = s.needsNetwork ? online : true;
+            if (on) activeCount++;
             const row = document.createElement('div');
             row.className = 'server-row'; row.dataset.sid = s.id;
             row.innerHTML = '<span class="srv-name">' + s.id + '</span><span class="srv-scope">' + s.scope + '</span><span class="srv-status"><span class="srv-dot ' + (on ? 'on' : 'off') + '"></span>' + (on ? 'online' : 'offline') + '</span>';
             dom.serverList.appendChild(row);
           });
+          const countEl = document.getElementById('server-count');
+          if (countEl) countEl.textContent = activeCount + ' Modules Active';
         }
 
         function renderSession() {

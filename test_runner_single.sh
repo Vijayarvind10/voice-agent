@@ -259,8 +259,4 @@ printf "${BOLD}${CYAN}║  Press Ctrl+C to stop                            ║${
 printf "${BOLD}${CYAN}╚══════════════════════════════════════════════════╝${NC}\n"
 
 # Run immediately, then every INTERVAL seconds
-for i in 1; do
-  run_tests
-  printf "\n${YELLOW}Next run in %d minutes... (Ctrl+C to stop)${NC}\n" $((INTERVAL/60))
-  sleep "$INTERVAL"
-done
+run_tests
