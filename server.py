@@ -79,8 +79,32 @@ def speak(text: str):
 
 
 # ── Intent Classification ─────────────────────────────────────────────
-def classify(text: str) -> dict:
+def classify(text: str, session_state: dict = None) -> dict:
     t = text.lower()
+    state = session_state or {}
+
+    # Handle awaiting slot for timer duration
+    if state.get("awaiting_slot") == "timer_duration":
+        # Check if the user is answering with a duration
+        m = re.search(r'(\d+)\s*(minute|min|second|sec|hour|hr)', t)
+        if m:
+            dur = f"{m.group(1)} {m.group(2)}s"
+            raw = int(m.group(1))
+            unit = m.group(2)
+            secs = raw * (3600 if 'hour' in unit or 'hr' in unit else 60 if 'min' in unit else 1)
+            return {"supported": True, "intent": "SET_TIMER", "confidence": 0.98,
+                    "routeType": "local", "servers": ["com.apple.timer.mcp"],
+                    "privacyClass": "local_safe", "params": {"duration": dur, "seconds": secs}}
+        # If they didn't provide a duration, but it's just a number:
+        m2 = re.search(r'^(\d+)$', t)
+        if m2:
+            dur = f"{m2.group(1)} minutes"
+            secs = int(m2.group(1)) * 60
+            return {"supported": True, "intent": "SET_TIMER", "confidence": 0.96,
+                    "routeType": "local", "servers": ["com.apple.timer.mcp"],
+                    "privacyClass": "local_safe", "params": {"duration": dur, "seconds": secs}}
+        # If they entirely changed the subject, fall through to normal classification
+        pass
 
     # Memory / context
     if re.search(r'(do that again|repeat|again|redo)', t):
@@ -96,13 +120,19 @@ def classify(text: str) -> dict:
     # Timer
     if re.search(r'timer|countdown|alarm', t):
         m = re.search(r'(\d+)\s*(minute|min|second|sec|hour|hr)', t)
-        dur = f"{m.group(1)} {m.group(2)}s" if m else "10 minutes"
-        raw = int(m.group(1)) if m else 10
-        unit = m.group(2) if m else "minute"
-        secs = raw * (3600 if 'hour' in unit or 'hr' in unit else 60 if 'min' in unit else 1)
-        return {"supported": True, "intent": "SET_TIMER", "confidence": 0.96,
-                "routeType": "local", "servers": ["com.apple.timer.mcp"],
-                "privacyClass": "local_safe", "params": {"duration": dur, "seconds": secs}}
+        if m:
+            dur = f"{m.group(1)} {m.group(2)}s"
+            raw = int(m.group(1))
+            unit = m.group(2)
+            secs = raw * (3600 if 'hour' in unit or 'hr' in unit else 60 if 'min' in unit else 1)
+            return {"supported": True, "intent": "SET_TIMER", "confidence": 0.96,
+                    "routeType": "local", "servers": ["com.apple.timer.mcp"],
+                    "privacyClass": "local_safe", "params": {"duration": dur, "seconds": secs}}
+        else:
+            # Missing duration
+            return {"supported": True, "intent": "MISSING_SLOT", "confidence": 0.90,
+                    "routeType": "local", "servers": [], "privacyClass": "local_safe",
+                    "params": {"slot": "timer_duration", "message": "For how long?"}}
 
     # Music
     if re.search(r'youtube|music|jazz|song|play|spotify', t):
@@ -231,12 +261,15 @@ def route_check(plan, network_mode):
 
 
 # ── Real Execution ────────────────────────────────────────────────────
-def execute(plan):
+def execute(plan: dict) -> dict:
     intent = plan["intent"]
-    p = plan.get("params", {})
+    p = plan["params"]
+
+    if intent == "MISSING_SLOT":
+        return {"log": "dialogue · clarifying", "entityId": f"dlg_{uid()}", "response": p.get("message", "Can you clarify?")}
 
     if intent == "REPEAT_LAST":
-        if conversation_history:
+        if len(conversation_history) > 1:
             last = conversation_history[-1]
             return {"log": f"replay · {last['intent']}", "entityId": f"replay_{uid()}",
                     "response": f"Repeating: {last['response']}"}
@@ -395,10 +428,11 @@ def split_commands(text: str) -> list:
 
 # ── WebSocket Pipeline ────────────────────────────────────────────────
 @app.websocket("/ws")
-async def websocket_pipeline(ws: WebSocket):
+async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     # Send server list on connect
     await ws.send_json({"type": "servers", "servers": SERVERS})
+    session_state = {"awaiting_slot": None}
     try:
         while True:
             data = await ws.receive_json()
@@ -435,13 +469,19 @@ async def websocket_pipeline(ws: WebSocket):
                 await asyncio.sleep(0.06)
 
                 # Stage 3: ATTENTION
-                plan = classify(transcript)
+                plan = classify(transcript, session_state)
                 att_st = "pcc" if plan["routeType"] == "pcc" else ("ok" if plan["supported"] else "err")
                 await ws.send_json({"type": "stage", "index": 2, "id": "attention",
                                     "status": att_st,
                                     "text": f"{plan['intent']} · confidence: {plan['confidence']:.2f}",
                                     "intent": plan["intent"], "confidence": plan["confidence"]})
                 await asyncio.sleep(0.06)
+
+                # Update session state based on intent
+                if plan["intent"] == "MISSING_SLOT":
+                    session_state["awaiting_slot"] = plan["params"]["slot"]
+                else:
+                    session_state["awaiting_slot"] = None
 
                 if not plan["supported"]:
                     await ws.send_json({"type": "fail_from", "startIndex": 3, "reason": "No matched intent"})

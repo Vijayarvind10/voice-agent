@@ -5,7 +5,7 @@
 # pipeline logic, and known bug-fix regressions.
 # Usage:  chmod +x test_runner.sh && ./test_runner.sh
 # ──────────────────────────────────────────────────────────────
-set -euo pipefail
+set -eu
 
 FILE="$(cd "$(dirname "$0")" && pwd)/index.html"
 INTERVAL=300  # seconds (5 minutes)

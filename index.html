@@ -203,7 +203,7 @@
       border-radius: 14px;
       box-shadow: 0 1px 3px rgba(0, 0, 0, .2), 0 8px 24px rgba(0, 0, 0, .12);
       padding: 18px;
-      transition: border-color .25s var(--ease), box-shadow .25s var(--ease);
+      transition: border-color .25s var(--ease), box-shadow .25s var(--ease), transform 0.25s var(--ease);
       position: relative;
     }
 
@@ -220,7 +220,35 @@
     }
 
     .card:hover {
-      border-color: rgba(255, 255, 255, .1)
+      border-color: rgba(255, 255, 255, .1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, .3), 0 12px 32px rgba(0, 0, 0, .15);
+    }
+
+    /* ━━━ Premium Spotlight Hover Effect ━━━ */
+    .glow-surface {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .glow-surface::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle 350px at var(--mouse-x, -500px) var(--mouse-y, -500px), rgba(255, 255, 255, 0.06), transparent 40%);
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 10;
+      border-radius: inherit;
+    }
+
+    .glow-surface:hover::after {
+      opacity: 1;
+    }
+
+    .glow-surface>* {
+      position: relative;
+      z-index: 1;
     }
 
     /* ━━━ Header ━━━ */
@@ -1512,22 +1540,22 @@
       </div>
 
       <div class="presets" id="presetGrid">
-        <button class="preset-btn" type="button" data-command="Set a timer for 5 minutes" data-privacy="ON"
+        <button class="preset-btn glow-surface" type="button" data-command="Set a timer for 5 minutes" data-privacy="ON"
           data-network="ONLINE">⏱ Set a timer<small>local · timer</small></button>
-        <button class="preset-btn" type="button" data-command="What's the weather" data-privacy="ON"
+        <button class="preset-btn glow-surface" type="button" data-command="What's the weather" data-privacy="ON"
           data-network="ONLINE">🌤 Weather<small>remote · live data</small></button>
-        <button class="preset-btn" type="button" data-command="Play jazz on YouTube Music" data-privacy="ON"
-          data-network="ONLINE">🎵 Play music<small>remote · youtube</small></button>
-        <button class="preset-btn" type="button" data-command="Take a screenshot" data-privacy="ON"
+        <button class="preset-btn glow-surface" type="button" data-command="Play jazz on YouTube Music"
+          data-privacy="ON" data-network="ONLINE">🎵 Play music<small>remote · youtube</small></button>
+        <button class="preset-btn glow-surface" type="button" data-command="Take a screenshot" data-privacy="ON"
           data-network="ONLINE">📸 Screenshot<small>local · capture</small></button>
-        <button class="preset-btn" type="button" data-command="What's my battery level" data-privacy="ON"
+        <button class="preset-btn glow-surface" type="button" data-command="What's my battery level" data-privacy="ON"
           data-network="ONLINE">🔋 System info<small>local · sysctl</small></button>
-        <button class="preset-btn" type="button" data-command="Remind me to buy groceries" data-privacy="ON"
-          data-network="ONLINE">📌 Reminder<small>local · Reminders.app</small></button>
-        <button class="preset-btn" type="button" data-command="Set a timer and play jazz" data-privacy="ON"
+        <button class="preset-btn glow-surface" type="button" data-command="Remind me to buy groceries"
+          data-privacy="ON" data-network="ONLINE">📌 Reminder<small>local · Reminders.app</small></button>
+        <button class="preset-btn glow-surface" type="button" data-command="Set a timer and play jazz" data-privacy="ON"
           data-network="ONLINE">⛓ Multi-chain<small>timer + music</small></button>
-        <button class="preset-btn" type="button" data-command="Search the web for restaurants" data-privacy="ON"
-          data-network="ONLINE">🔍 Web search<small>privacy test</small></button>
+        <button class="preset-btn glow-surface" type="button" data-command="Search the web for restaurants"
+          data-privacy="ON" data-network="ONLINE">🔍 Web search<small>privacy test</small></button>
       </div>
     </div>
 
@@ -1639,22 +1667,22 @@
 
       <!-- Metric cards -->
       <div class="metrics-grid" id="metricsGrid">
-        <div class="metric-card">
+        <div class="metric-card glow-surface">
           <div class="metric-value blue" id="m-total">0</div>
           <div class="metric-label">Total Runs</div>
           <div class="metric-sub" id="m-rate">—</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card glow-surface">
           <div class="metric-value green" id="m-success">—</div>
           <div class="metric-label">Success Rate</div>
           <div class="metric-sub" id="m-success-n">0 succeeded</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card glow-surface">
           <div class="metric-value yellow" id="m-conf">—</div>
           <div class="metric-label">Avg Confidence</div>
           <div class="metric-sub" id="m-conf-range">—</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card glow-surface">
           <div class="metric-value purple" id="m-latency">—</div>
           <div class="metric-label">Avg Latency</div>
           <div class="metric-sub" id="m-latency-range">—</div>
@@ -1663,17 +1691,17 @@
 
       <!-- Percentile bars -->
       <div class="percentile-row" id="percentileRow">
-        <div class="pctl-card">
+        <div class="pctl-card glow-surface">
           <div class="pctl-label">P50 Latency</div>
           <div class="pctl-value" id="p50">—</div>
           <div class="pctl-bar" id="p50bar" style="width:0; background:var(--green)"></div>
         </div>
-        <div class="pctl-card">
+        <div class="pctl-card glow-surface">
           <div class="pctl-label">P90 Latency</div>
           <div class="pctl-value" id="p90">—</div>
           <div class="pctl-bar" id="p90bar" style="width:0; background:var(--yellow)"></div>
         </div>
-        <div class="pctl-card">
+        <div class="pctl-card glow-surface">
           <div class="pctl-label">P99 Latency</div>
           <div class="pctl-value" id="p99">—</div>
           <div class="pctl-bar" id="p99bar" style="width:0; background:var(--red)"></div>
@@ -1682,11 +1710,11 @@
 
       <!-- Charts + Intent distribution -->
       <div class="analytics-panels">
-        <div class="analytics-sub-card">
+        <div class="analytics-sub-card glow-surface">
           <div class="sub-title">Latency Trend</div>
           <canvas id="sparkCanvas" height="64"></canvas>
         </div>
-        <div class="analytics-sub-card">
+        <div class="analytics-sub-card glow-surface">
           <div class="sub-title">Intent Distribution</div>
           <div id="intentBreakdown">
             <div class="empty-state">No data yet</div>
@@ -1729,6 +1757,18 @@
       const appShell = document.getElementById('appShell');
       setTimeout(() => { boot.classList.add('fade-out'); canvas.classList.add('visible'); appShell.classList.add('revealed'); }, 1500);
       setTimeout(() => boot.remove(), 2200);
+
+      /* ── Glow Effect ─── */
+      function initGlow() {
+        document.querySelectorAll('.glow-surface, .card').forEach(el => {
+          el.addEventListener('mousemove', e => {
+            const rect = el.getBoundingClientRect();
+            el.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
+            el.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+          });
+        });
+      }
+      initGlow();
 
       /* ── Star field ─── */
       const sCtx = canvas.getContext('2d');
@@ -1802,6 +1842,9 @@
       const session = { id: uid(), turns: 0, lastEntity: "none", expiresIn: 95, active: true };
       let running = false, runCounter = 0, completedStages = 0, pendingMicPromise = null;
       let pipelineStartTime = 0, currentRunMeta = null;
+      
+      // Multi-turn context
+      let dialogState = { awaiting_slot: null };
 
       /* ── Web Speech API ─── */
       let recognition = null, audioCtx = null, analyser = null, micStream = null;
@@ -2080,6 +2123,11 @@
         currentRunMeta.intent = plan.intent;
         currentRunMeta.confidence = plan.confidence;
         currentRunMeta.routeType = plan.routeType;
+
+        // Update dialog state for multi-turn
+        if (plan.intent === 'MISSING_SLOT') dialogState.awaiting_slot = plan.params.slot;
+        else dialogState.awaiting_slot = null;
+
         if (!plan.supported) { await failFrom(3, rid, 'No matched intent.'); return done(); }
         const priv = privacyCheck(plan, env);
         const privSt = priv.approved ? (plan.routeType === 'pcc' ? 'pcc' : 'ok') : 'err';
@@ -2172,14 +2220,36 @@
       /* ── Classification ─── */
       function classify(text) {
         const t = text.toLowerCase();
+        
+        // Handle awaiting slot for multi-turn context
+        if (dialogState.awaiting_slot === 'timer_duration') {
+          const m = t.match(/(\d+)\s*(minute|min|second|sec|hour|hr)/);
+          if (m) {
+            const dur = `${m[1]} ${m[2]}s`;
+            return { supported: true, intent: 'SET_TIMER', confidence: 0.98, routeType: 'local', servers: ['com.apple.timer.mcp'], privacyClass: 'local_safe', params: { duration: dur } };
+          }
+          const m2 = t.match(/^(\d+)$/);
+          if (m2) {
+            const dur = `${m2[1]} minutes`;
+            return { supported: true, intent: 'SET_TIMER', confidence: 0.96, routeType: 'local', servers: ['com.apple.timer.mcp'], privacyClass: 'local_safe', params: { duration: dur } };
+          }
+        }
+
         // Memory / context
         if (/(do that again|repeat|again|redo)/.test(t))
           return { supported: true, intent: 'REPEAT_LAST', confidence: 0.95, routeType: 'local', servers: ['com.apple.clipboard.mcp'], privacyClass: 'local_safe' };
         if (/(what did i|last command|history|what was)/.test(t))
           return { supported: true, intent: 'RECALL_HISTORY', confidence: 0.93, routeType: 'local', servers: ['com.apple.clipboard.mcp'], privacyClass: 'local_safe' };
         // Timer
-        if (/timer|countdown|alarm/.test(t))
-          return { supported: true, intent: 'SET_TIMER', confidence: 0.96, routeType: 'local', servers: ['com.apple.timer.mcp'], privacyClass: 'local_safe' };
+        if (/timer|countdown|alarm/.test(t)) {
+          const m = t.match(/(\d+)\s*(minute|min|second|sec|hour|hr)/);
+          if (m) {
+            const dur = `${m[1]} ${m[2]}s`;
+            return { supported: true, intent: 'SET_TIMER', confidence: 0.96, routeType: 'local', servers: ['com.apple.timer.mcp'], privacyClass: 'local_safe', params: { duration: dur } };
+          } else {
+            return { supported: true, intent: 'MISSING_SLOT', confidence: 0.90, routeType: 'local', servers: [], privacyClass: 'local_safe', params: { slot: "timer_duration", message: "For how long?" } };
+          }
+        }
         // Music
         if (/youtube|music|jazz|song|play|spotify/.test(t))
           return { supported: true, intent: 'PLAY_MUSIC', confidence: 0.93, routeType: 'remote', servers: ['com.google.youtubemusic'], privacyClass: 'remote_media' };
@@ -2242,7 +2312,8 @@
       }
       function execute(plan) {
         switch (plan.intent) {
-          case 'SET_TIMER': return { log: 'timer · armed for duration', entityId: 'timer_' + uid(), response: 'Timer set' };
+          case 'MISSING_SLOT':        return { log: 'dialogue · clarifying', entityId: 'dlg_' + uid(), response: plan.params ? plan.params.message : 'Can you clarify?' };
+          case 'SET_TIMER':           return { log: 'timer · armed for duration', entityId: 'timer_' + uid(), response: 'Timer set' };
           case 'PLAY_MUSIC': return { log: 'youtube_music · playback started', entityId: 'music_' + uid(), response: 'Playing on YouTube Music' };
           case 'GET_WEATHER': return { log: 'weather · fetched', entityId: 'weather_' + uid(), response: 'Weather data retrieved' };
           case 'TAKE_SCREENSHOT': return { log: 'screenshot · saved', entityId: 'ss_' + uid(), response: 'Screenshot saved to Desktop' };
@@ -2401,6 +2472,14 @@
         document.getElementById('p90bar').style.width = (p90 / maxP * 100) + '%';
         document.getElementById('p99bar').style.width = '100%';
 
+        // Pulse the metrics grid to show update
+        const mGrid = document.getElementById('metricsGrid');
+        if (runs.length > 1) {
+          mGrid.style.animation = 'none';
+          void mGrid.offsetWidth; // trigger reflow
+          mGrid.style.animation = 'stagePopIn 0.3s var(--spring)';
+        }
+
         // Sparkline
         drawSparkline(lats.slice(-30));
 
@@ -2419,11 +2498,12 @@
 
         // History table
         const tbody = document.getElementById('historyBody');
-        tbody.innerHTML = runs.slice().reverse().map(r => {
+        tbody.innerHTML = runs.slice().reverse().map((r, i) => {
           const dotCls = r.succeeded ? 's-ok' : 's-err';
           const statusTxt = r.succeeded ? 'OK' : 'FAIL';
           const cmdShort = r.cmd.length > 28 ? r.cmd.slice(0, 28) + '…' : r.cmd;
-          return '<tr>' +
+          const delay = Math.min(i * 0.04, 0.4).toFixed(2);
+          return '<tr style="animation: fadeUp 0.35s var(--ease-out) ' + delay + 's both">' +
             '<td>' + r.id + '</td>' +
             '<td>' + esc(cmdShort) + '</td>' +
             '<td>' + r.intent + '</td>' +
