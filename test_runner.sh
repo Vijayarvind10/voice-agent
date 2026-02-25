@@ -239,6 +239,16 @@ run_tests() {
      fail "Bug 11 REGRESSION: startAudioVis() might still be in click handler directly"
   fi
 
+  # ─── 12. Python Unit Tests ───
+  log "Python Unit Tests"
+
+  if OUTPUT=$(python3 test_server.py 2>&1); then
+    pass "server.py unit tests passed"
+  else
+    fail "server.py unit tests failed"
+    echo "$OUTPUT"
+  fi
+
   # ─── Summary ───
   TOTAL=$((PASS+FAIL))
   header "Results: $PASS/$TOTAL passed, $FAIL failed"
