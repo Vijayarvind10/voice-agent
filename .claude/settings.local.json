@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(git init)",
+      "Bash(git branch -M main)",
+      "Bash(git add index.html README.md .github/workflows/deploy.yml)",
+      "Bash(git commit:*)",
+      "Bash(gh auth status)",
+      "Bash(brew list gh)",
+      "Bash(brew install gh)"
+    ]
+  }
+}

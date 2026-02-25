@@ -1,209 +1,650 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Voice Agent Pipeline Demo</title>
+  <title>Real Time Voice MCP</title>
+  <meta name="description" content="Real Time Voice MCP — Attention-Based Routing Engine by Vijay Arvind Ramamoorthy">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     :root {
       color-scheme: dark;
-      --bg-0: #060a11;
-      --bg-1: #0d1321;
-      --bg-2: #151d2e;
-      --bg-card: rgba(13, 19, 33, 0.92);
-      --text-0: #e8edf5;
-      --text-1: #8899b0;
-      --text-2: #5a6b82;
-      --border: rgba(56, 78, 112, 0.35);
-      --border-hover: rgba(80, 110, 150, 0.5);
-      --ok: #34d399;
-      --ok-glow: rgba(52, 211, 153, 0.4);
-      --err: #f87171;
-      --err-glow: rgba(248, 113, 113, 0.4);
-      --pcc: #fbbf24;
-      --pcc-glow: rgba(251, 191, 36, 0.4);
-      --active: #60a5fa;
-      --active-glow: rgba(96, 165, 250, 0.4);
-      --accent: #3b82f6;
-      --accent-hover: #2563eb;
-      --radius: 16px;
-      --radius-sm: 10px;
-      --mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
-      --sans: "Inter", -apple-system, "Segoe UI", sans-serif;
-      --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      --bg-deep: #111118;
+      --bg-black: #0c0c12;
+      --text-0: #e8e8ed;
+      --text-1: rgba(232, 232, 237, 0.65);
+      --text-2: rgba(232, 232, 237, 0.38);
+      --text-3: rgba(232, 232, 237, 0.2);
+      --blue: #6C8EEF;
+      --green: #5EDBA0;
+      --yellow: #F0C66E;
+      --red: #E8706A;
+      --purple: #A78BDB;
+      --blue-dim: rgba(108, 142, 239, 0.12);
+      --green-dim: rgba(94, 219, 160, 0.1);
+      --yellow-dim: rgba(240, 198, 110, 0.1);
+      --red-dim: rgba(232, 112, 106, 0.1);
+      --purple-dim: rgba(167, 139, 219, 0.1);
+      --blue-glow: rgba(108, 142, 239, 0.2);
+      --green-glow: rgba(94, 219, 160, 0.2);
+      --yellow-glow: rgba(240, 198, 110, 0.18);
+      --red-glow: rgba(232, 112, 106, 0.2);
+      --purple-glow: rgba(167, 139, 219, 0.2);
+      --glass-bg: rgba(255, 255, 255, 0.04);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-inner: rgba(0, 0, 0, 0.2);
+      --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      --mono: "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
     }
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
 
     body {
       font-family: var(--sans);
       color: var(--text-0);
-      background: var(--bg-0);
+      background: var(--bg-black);
+      background-image: radial-gradient(ellipse at 50% 0%, rgba(108, 142, 239, 0.04) 0%, transparent 60%);
       min-height: 100vh;
       overflow-x: hidden;
+      font-size: 14px;
+      line-height: 1.6;
     }
 
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 60% 50% at 80% 0%, rgba(59, 130, 246, 0.12), transparent),
-        radial-gradient(ellipse 50% 40% at 10% 100%, rgba(52, 211, 153, 0.08), transparent),
-        radial-gradient(ellipse 40% 30% at 50% 50%, rgba(139, 92, 246, 0.05), transparent);
-      pointer-events: none;
-      z-index: 0;
+    /* Boot overlay & star canvas removed for a cleaner instant-load experience */
+
+    /* ── App shell ─── */
+    .app {
+      position: relative;
+      z-index: 1;
+      padding: 48px 40px 64px;
+      max-width: 1280px;
+      margin: 0 auto;
+      opacity: 1;
+      animation: appFadeIn 0.5s var(--ease) both;
     }
 
-    .app { position: relative; z-index: 1; padding: 20px 24px 40px; max-width: 1380px; margin: 0 auto; }
+    @keyframes appFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
 
-    /* Header */
-    .header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
-    .header-icon {
-      width: 44px; height: 44px; border-radius: 12px;
-      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px; flex-shrink: 0;
-      box-shadow: 0 0 24px rgba(59, 130, 246, 0.3);
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
-    .header-icon svg { width: 24px; height: 24px; fill: white; }
-    .header h1 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; }
-    .header p { font-size: 0.85rem; color: var(--text-1); margin-top: 2px; }
 
-    /* Cards */
+    /* ── Glass card ─── */
     .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 18px;
-      backdrop-filter: blur(12px);
-      transition: border-color var(--transition);
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px) saturate(140%);
+      -webkit-backdrop-filter: blur(20px) saturate(140%);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      box-shadow: 0 2px 16px rgba(0, 0, 0, 0.25);
+      padding: 20px;
+      transition: border-color 0.3s var(--ease);
     }
 
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    /* ── Header ─── */
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+      padding-top: 8px;
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      color: var(--text-0);
+      line-height: 1.2;
+      margin-bottom: 6px;
+    }
+
+    .header h1 span {
+      font-weight: 600;
+    }
+
+    .header .subtitle {
+      font-size: 0.875rem;
+      font-weight: 400;
+      color: var(--text-2);
+      letter-spacing: 0;
+      margin-bottom: 0;
+    }
+
+    /* Gradient badge — hidden */
+    .gradient-badge {
+      display: none;
+    }
+
+    /* ── Identity card hidden ─── */
+    .id-card {
+      display: none;
+    }
+
+    /* ── Top progress bar ─── */
+    .top-progress {
+      display: flex;
+      gap: 3px;
+      margin: 20px auto 0;
+      max-width: 320px;
+    }
+
+    .top-progress .prog-step {
+      flex: 1;
+      height: 3px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.06);
+      transition: background 0.3s var(--ease);
+    }
+
+    .top-progress .prog-step.done {
+      background: var(--green);
+    }
+
+    .top-progress .prog-step.active {
+      background: var(--blue);
+      animation: subtlePulse 2s ease-in-out infinite;
+    }
+
+    .top-progress .prog-step.error {
+      background: var(--red);
+    }
+
+    .top-progress .prog-step.pcc {
+      background: var(--yellow);
+    }
+
+    @keyframes subtlePulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    /* Legacy id-progress kept for JS compatibility */
+    .id-progress {
+      display: none;
+    }
+
+    .id-live-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: liveBlink 2s ease-in-out infinite;
+    }
+
+    .id-live-dot.off {
+      background: var(--text-3);
+      animation: none;
+    }
+
+    @keyframes liveBlink {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.35;
+      }
+    }
+
+    /* ── Panel labels ─── */
     .panel-label {
-      font-size: 0.7rem;
-      font-weight: 700;
+      font-size: 11px;
+      font-weight: 600;
       letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--text-2);
-      margin-bottom: 12px;
+      margin-bottom: 14px;
     }
 
-    /* Controls */
-    .controls-bar {
-      display: grid;
-      grid-template-columns: 1fr auto auto auto;
-      gap: 10px;
+    /* ── Mic button ─── */
+    .mic-area {
+      display: flex;
+      flex-direction: column;
       align-items: center;
-      margin-bottom: 16px;
+      gap: 12px;
+      margin-bottom: 8px;
     }
 
-    input[type="text"], select {
+    .mic-btn {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      cursor: pointer;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s var(--spring);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+      animation: micIdlePulse 3s ease-in-out infinite;
+    }
+
+    .mic-btn svg {
+      width: 28px;
+      height: 28px;
+      fill: var(--text-1);
+      transition: fill 0.2s;
+      z-index: 2;
+    }
+
+    .mic-btn:hover {
+      transform: scale(1.06);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .mic-btn:active {
+      transform: scale(0.94);
+    }
+
+    .mic-btn.listening {
+      border-color: var(--blue);
+      background: var(--blue-dim);
+      animation: none;
+      box-shadow: 0 0 30px var(--blue-glow), 0 4px 24px rgba(0, 0, 0, 0.5);
+    }
+
+    .mic-btn.listening svg {
+      fill: var(--blue);
+    }
+
+    .mic-btn.processing {
+      animation: micSpin 1.5s linear infinite;
+      filter: blur(0.5px);
+    }
+
+    @keyframes micIdlePulse {
+
+      0%,
+      100% {
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5)
+      }
+
+      50% {
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(255, 255, 255, 0.06)
+      }
+    }
+
+    @keyframes micSpin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* Siri-orb rings */
+    .mic-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1.5px solid var(--blue);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .mic-btn.listening .mic-ring {
+      animation: ringExpand 1.5s ease-out infinite;
+    }
+
+    .mic-btn.listening .mic-ring:nth-child(2) {
+      animation-delay: 0.5s;
+    }
+
+    .mic-btn.listening .mic-ring:nth-child(3) {
+      animation-delay: 1s;
+    }
+
+    @keyframes ringExpand {
+      0% {
+        width: 72px;
+        height: 72px;
+        opacity: 0.5
+      }
+
+      100% {
+        width: 130px;
+        height: 130px;
+        opacity: 0
+      }
+    }
+
+    .mic-label {
+      font-size: 13px;
+      font-weight: 300;
+      color: var(--text-2);
+      letter-spacing: 0.04em;
+      min-height: 20px;
+    }
+
+    /* Audio visualizer canvas inside mic */
+    #micVisualizer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── Controls card ─── */
+    .controls-card {
+      margin-bottom: 24px;
+    }
+
+    .controls-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .input-wrap {
+      flex: 1;
+      min-width: 200px;
+      position: relative;
+    }
+
+    .input-wrap input {
+      width: 100%;
       height: 44px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: rgba(6, 10, 17, 0.8);
+      border-radius: 12px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-inner);
       color: var(--text-0);
       font-family: var(--sans);
-      font-size: 0.9rem;
-      padding: 0 14px;
-      width: 100%;
-      transition: border-color var(--transition), box-shadow var(--transition);
+      font-size: 14px;
+      font-weight: 400;
+      padding: 0 16px;
+      letter-spacing: -0.01em;
+      transition: border-color 0.25s, box-shadow 0.25s;
     }
 
-    input[type="text"]:focus, select:focus {
+    .input-wrap input::placeholder {
+      color: var(--text-3);
+    }
+
+    .input-wrap input:focus {
       outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(108, 142, 239, 0.1);
     }
 
-    select { width: 170px; cursor: pointer; appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' stroke='%238899b0' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
-      background-repeat: no-repeat; background-position: right 12px center;
-      padding-right: 30px;
+    .input-wrap input.interim {
+      font-style: italic;
+      color: var(--text-2);
     }
 
-    .speak-btn {
-      height: 44px; min-width: 130px; border: none; border-radius: var(--radius-sm);
-      background: linear-gradient(135deg, #3b82f6, #6366f1);
-      color: white; font-family: var(--sans); font-size: 0.9rem; font-weight: 700;
-      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
-      transition: transform 0.15s ease, box-shadow var(--transition), opacity var(--transition);
-      box-shadow: 0 4px 16px rgba(59, 130, 246, 0.25);
+    .input-wrap .mic-icon {
+      display: none;
     }
-    .speak-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(59, 130, 246, 0.35); }
-    .speak-btn:active:not(:disabled) { transform: translateY(1px); }
-    .speak-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-    .speak-btn svg { width: 18px; height: 18px; fill: currentColor; }
 
-    /* Presets */
-    .presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+    /* Live intent badge */
+    .intent-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 500;
+      background: var(--blue-dim);
+      border: 1px solid rgba(108, 142, 239, 0.2);
+      color: var(--blue);
+      white-space: nowrap;
+      transition: all 0.3s var(--ease);
+      min-height: 32px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .intent-badge .conf-ring {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .intent-badge .conf-ring circle {
+      transition: stroke-dashoffset 0.4s var(--ease);
+    }
+
+    /* ── Toggle switches ─── */
+    .toggle-group {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .toggle-label {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--text-2);
+    }
+
+    .toggle {
+      width: 38px;
+      height: 22px;
+      border-radius: 11px;
+      position: relative;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      transition: background 0.25s var(--ease);
+    }
+
+    .toggle::after {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+      transition: transform 0.25s var(--spring);
+    }
+
+    .toggle.on {
+      background: var(--green);
+    }
+
+    .toggle.on::after {
+      transform: translateX(16px);
+    }
+
+    /* ── Presets ─── */
+    .presets {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 14px;
+    }
+
     .preset-btn {
-      border: 1px solid var(--border); border-radius: var(--radius-sm);
-      background: rgba(13, 19, 33, 0.7); color: var(--text-0);
-      font-family: var(--sans); font-size: 0.82rem; font-weight: 600;
-      padding: 12px; text-align: left; cursor: pointer;
-      transition: border-color var(--transition), background var(--transition), transform 0.15s ease;
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-1);
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 10px 16px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s var(--ease);
+      line-height: 1.35;
     }
-    .preset-btn:hover:not(:disabled) { border-color: var(--border-hover); background: rgba(21, 29, 46, 0.9); transform: translateY(-1px); }
-    .preset-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-    .preset-btn small { display: block; margin-top: 5px; color: var(--text-2); font-family: var(--mono); font-size: 0.68rem; font-weight: 500; }
 
-    /* Layout */
-    .main-layout { display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: start; }
-
-    /* Pipeline Diagram */
-    .pipeline-wrap { position: relative; padding: 8px 0; }
-    .pipeline-svg { width: 100%; height: auto; display: block; }
-
-    .stage-node {
-      cursor: default;
-      transition: filter var(--transition);
+    .preset-btn:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.12);
     }
+
+    .preset-btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .preset-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .preset-btn small {
+      display: block;
+      margin-top: 3px;
+      font-size: 10px;
+      font-weight: 400;
+      color: var(--text-3);
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Speak button ─── */
+    .speak-btn {
+      height: 44px;
+      min-width: 100px;
+      border: none;
+      border-radius: 12px;
+      background: var(--blue);
+      color: #fff;
+      font-family: var(--sans);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s var(--ease);
+      box-shadow: 0 1px 8px var(--blue-glow);
+    }
+
+    .speak-btn:hover:not(:disabled) {
+      filter: brightness(1.1);
+      box-shadow: 0 2px 16px var(--blue-glow);
+    }
+
+    .speak-btn:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+
+    .speak-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .speak-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+
+    /* ── Main layout ─── */
+    .main-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+
+    /* ── Pipeline SVG ─── */
+    .pipeline-wrap {
+      position: relative;
+      padding: 16px 0;
+    }
+
+    .pipeline-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
     .stage-rect {
-      fill: rgba(13, 19, 33, 0.95);
-      stroke: rgba(56, 78, 112, 0.5);
-      stroke-width: 1.5;
-      rx: 12;
-      transition: stroke 0.3s ease, filter 0.3s ease;
+      fill: rgba(28, 28, 30, 0.95);
+      stroke: rgba(255, 255, 255, 0.1);
+      stroke-width: 1;
+      rx: 14;
+      transition: stroke 0.35s var(--ease), fill 0.35s var(--ease), filter 0.35s var(--ease);
     }
+
     .stage-label {
       fill: var(--text-0);
       font-family: var(--sans);
-      font-size: 11px;
+      font-size: 10.5px;
       font-weight: 700;
       text-anchor: middle;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       pointer-events: none;
     }
+
     .stage-sub {
       fill: var(--text-2);
       font-family: var(--mono);
-      font-size: 8.5px;
+      font-size: 8px;
+      font-weight: 500;
       text-anchor: middle;
       pointer-events: none;
     }
 
     .conn-line {
-      stroke: rgba(56, 78, 112, 0.4);
+      stroke: rgba(255, 255, 255, 0.06);
       stroke-width: 1.5;
       fill: none;
-      transition: stroke 0.4s ease;
-    }
-    .conn-arrow {
-      fill: rgba(56, 78, 112, 0.4);
-      transition: fill 0.4s ease;
+      transition: stroke 0.4s;
     }
 
-    /* Animated particle on connections */
+    .conn-arrow {
+      fill: rgba(255, 255, 255, 0.06);
+      transition: fill 0.4s;
+    }
+
     .flow-particle {
       r: 3;
-      fill: var(--active);
+      fill: var(--blue);
       opacity: 0;
-      filter: drop-shadow(0 0 4px var(--active));
+      filter: drop-shadow(0 0 6px var(--blue));
     }
+
     .flow-particle.running {
       opacity: 1;
       animation: particleGlow 0.8s ease-in-out infinite;
@@ -211,195 +652,889 @@
 
     /* Stage states */
     .stage-node.active .stage-rect {
-      stroke: var(--active);
-      filter: drop-shadow(0 0 12px var(--active-glow)) drop-shadow(0 0 4px var(--active-glow));
-      animation: stagePulse 1.2s ease-in-out infinite;
-    }
-    .stage-node.success .stage-rect {
-      stroke: var(--ok);
-      fill: rgba(6, 36, 28, 0.7);
-      filter: drop-shadow(0 0 8px var(--ok-glow));
-    }
-    .stage-node.error .stage-rect {
-      stroke: var(--err);
-      fill: rgba(50, 10, 10, 0.7);
-      filter: drop-shadow(0 0 8px var(--err-glow));
-    }
-    .stage-node.pcc .stage-rect {
-      stroke: var(--pcc);
-      fill: rgba(50, 35, 5, 0.7);
-      filter: drop-shadow(0 0 8px var(--pcc-glow));
+      stroke: var(--blue);
+      stroke-width: 1.5;
+      fill: var(--blue-dim);
+      filter: drop-shadow(0 0 16px var(--blue-glow));
+      animation: stagePulse 1.5s ease-in-out infinite;
     }
 
-    .conn-line.lit-ok { stroke: var(--ok); filter: drop-shadow(0 0 4px var(--ok-glow)); }
-    .conn-line.lit-err { stroke: var(--err); filter: drop-shadow(0 0 4px var(--err-glow)); }
-    .conn-line.lit-pcc { stroke: var(--pcc); filter: drop-shadow(0 0 4px var(--pcc-glow)); }
-    .conn-line.lit-active { stroke: var(--active); filter: drop-shadow(0 0 4px var(--active-glow)); }
-    .conn-arrow.lit-ok { fill: var(--ok); }
-    .conn-arrow.lit-err { fill: var(--err); }
-    .conn-arrow.lit-pcc { fill: var(--pcc); }
-    .conn-arrow.lit-active { fill: var(--active); }
+    .stage-node.success .stage-rect {
+      stroke: var(--green);
+      fill: var(--green-dim);
+      filter: drop-shadow(0 0 10px var(--green-glow));
+    }
+
+    .stage-node.error .stage-rect {
+      stroke: var(--red);
+      fill: var(--red-dim);
+      filter: drop-shadow(0 0 10px var(--red-glow));
+    }
+
+    .stage-node.pcc .stage-rect {
+      stroke: var(--yellow);
+      fill: var(--yellow-dim);
+      filter: drop-shadow(0 0 10px var(--yellow-glow));
+    }
+
+    .conn-line.lit-ok {
+      stroke: var(--green);
+      filter: drop-shadow(0 0 6px var(--green-glow));
+    }
+
+    .conn-line.lit-err {
+      stroke: var(--red);
+      filter: drop-shadow(0 0 6px var(--red-glow));
+    }
+
+    .conn-line.lit-pcc {
+      stroke: var(--yellow);
+      filter: drop-shadow(0 0 6px var(--yellow-glow));
+    }
+
+    .conn-line.lit-active {
+      stroke: var(--blue);
+      filter: drop-shadow(0 0 6px var(--blue-glow));
+    }
+
+    .conn-arrow.lit-ok {
+      fill: var(--green);
+    }
+
+    .conn-arrow.lit-err {
+      fill: var(--red);
+    }
+
+    .conn-arrow.lit-pcc {
+      fill: var(--yellow);
+    }
+
+    .conn-arrow.lit-active {
+      fill: var(--blue);
+    }
 
     @keyframes stagePulse {
-      0%, 100% { filter: drop-shadow(0 0 10px var(--active-glow)) drop-shadow(0 0 3px var(--active-glow)); }
-      50% { filter: drop-shadow(0 0 18px var(--active-glow)) drop-shadow(0 0 6px var(--active-glow)); }
-    }
-    @keyframes particleGlow {
-      0%, 100% { opacity: 0.6; }
-      50% { opacity: 1; }
+
+      0%,
+      100% {
+        filter: drop-shadow(0 0 12px var(--blue-glow))
+      }
+
+      50% {
+        filter: drop-shadow(0 0 24px var(--blue-glow)) drop-shadow(0 0 8px var(--blue-glow))
+      }
     }
 
-    /* Log Panel */
+    @keyframes particleGlow {
+
+      0%,
+      100% {
+        opacity: 0.5
+      }
+
+      50% {
+        opacity: 1
+      }
+    }
+
+    /* Stage change micro-interaction */
+    @keyframes stagePopIn {
+      0% {
+        transform: scale(1)
+      }
+
+      50% {
+        transform: scale(1.06)
+      }
+
+      100% {
+        transform: scale(1)
+      }
+    }
+
+    /* ── Log panel ─── */
     .log-panel {
-      background: rgba(4, 7, 14, 0.85);
-      border: 1px solid rgba(40, 55, 80, 0.4);
-      border-radius: var(--radius-sm);
-      padding: 14px;
-      min-height: 200px;
-      max-height: 280px;
+      background: var(--glass-inner);
+      border-radius: 12px;
+      padding: 16px 18px;
+      min-height: 180px;
+      max-height: 260px;
       overflow-y: auto;
       font-family: var(--mono);
-      font-size: 0.8rem;
-      line-height: 1.55;
+      font-size: 13px;
+      line-height: 1.65;
       scrollbar-width: thin;
-      scrollbar-color: rgba(56, 78, 112, 0.4) transparent;
+      scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
     }
-    .log-panel::-webkit-scrollbar { width: 6px; }
-    .log-panel::-webkit-scrollbar-track { background: transparent; }
-    .log-panel::-webkit-scrollbar-thumb { background: rgba(56, 78, 112, 0.4); border-radius: 3px; }
+
+    .log-panel::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .log-panel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .log-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+    }
 
     .log-line {
       opacity: 0;
-      transform: translateX(-8px);
-      animation: logReveal 0.35s ease forwards;
-      margin-bottom: 4px;
+      transform: translateX(-12px);
+      animation: logSlideIn 0.35s var(--ease) forwards;
+      margin-bottom: 3px;
       white-space: pre-wrap;
-      color: rgba(180, 200, 225, 0.9);
-    }
-    .log-line .stage-tag { color: var(--active); font-weight: 600; }
-    .log-line .mark-ok { color: var(--ok); font-weight: 700; }
-    .log-line .mark-err { color: var(--err); font-weight: 700; }
-    .log-line .mark-pcc { color: var(--pcc); font-weight: 700; }
-
-    @keyframes logReveal {
-      to { opacity: 1; transform: translateX(0); }
+      color: var(--text-1);
     }
 
-    /* Legend */
-    .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .log-line .stage-tag {
+      color: var(--blue);
+      font-weight: 600;
+    }
+
+    .log-line .mark-ok {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .log-line .mark-err {
+      color: var(--red);
+      font-weight: 700;
+    }
+
+    .log-line .mark-pcc {
+      color: var(--yellow);
+      font-weight: 700;
+    }
+
+    @keyframes logSlideIn {
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* ── Legend ─── */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
     .legend-chip {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 4px 10px; border-radius: 999px;
-      border: 1px solid rgba(56, 78, 112, 0.3);
-      background: rgba(6, 10, 17, 0.6);
-      font-size: 0.7rem; font-family: var(--mono); color: var(--text-1);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.03);
+      font-size: 11px;
+      font-family: var(--mono);
+      color: var(--text-2);
+      font-weight: 500;
     }
-    .legend-dot { width: 7px; height: 7px; border-radius: 50%; }
 
-    /* Right Column */
-    .right-col { display: grid; gap: 16px; }
+    .legend-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
 
-    /* Server Registry */
-    .server-list { display: grid; gap: 6px; }
+    /* ── Server registry ─── */
+    .server-list {
+      display: grid;
+      gap: 8px;
+    }
+
     .server-row {
-      display: grid; grid-template-columns: 1fr auto auto;
-      gap: 8px; align-items: center;
-      border: 1px solid rgba(56, 78, 112, 0.25);
-      border-radius: 10px; padding: 10px 12px;
-      background: rgba(6, 10, 17, 0.6);
-      font-family: var(--mono); font-size: 0.75rem;
-      transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease, background 0.3s ease;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.02);
+      font-family: var(--mono);
+      font-size: 12px;
+      transition: all 0.35s var(--ease);
+      border-left: 3px solid transparent;
     }
-    .server-row .srv-name { color: var(--text-0); font-weight: 500; }
-    .server-row .srv-scope { color: var(--text-2); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.05em; }
-    .server-row .srv-status { display: flex; align-items: center; gap: 5px; }
+
+    .server-row .srv-name {
+      color: var(--text-0);
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .server-row .srv-scope {
+      color: var(--text-2);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+    }
+
+    .server-row .srv-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-2);
+    }
+
     .srv-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
     }
-    .srv-dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok-glow); }
-    .srv-dot.off { background: var(--err); box-shadow: 0 0 8px var(--err-glow); }
+
+    .srv-dot.on {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green-glow);
+    }
+
+    .srv-dot.off {
+      background: var(--red);
+      box-shadow: 0 0 8px var(--red-glow);
+    }
 
     .server-row.hit {
-      border-color: var(--active);
-      background: rgba(59, 130, 246, 0.08);
-      box-shadow: 0 0 16px rgba(96, 165, 250, 0.15);
-      transform: scale(1.02);
+      border-color: rgba(10, 132, 255, 0.4);
+      background: var(--blue-dim);
+      box-shadow: 0 0 20px rgba(10, 132, 255, 0.1);
+      transform: scale(1.015);
     }
 
-    /* Session */
+    @keyframes borderFlash {
+      0% {
+        border-left-color: var(--blue)
+      }
+
+      100% {
+        border-left-color: transparent
+      }
+    }
+
+    /* ── Session panel ─── */
     .session-grid {
-      display: grid; gap: 8px;
-      font-family: var(--mono); font-size: 0.78rem;
+      display: grid;
+      gap: 10px;
+      font-family: var(--mono);
+      font-size: 13px;
     }
-    .session-grid .s-row { display: flex; justify-content: space-between; align-items: center; }
-    .session-grid .s-key { color: var(--text-2); }
-    .session-grid .s-val { color: var(--text-0); font-weight: 600; }
 
-    /* Responsive */
-    @media (max-width: 1100px) {
-      .main-layout { grid-template-columns: 1fr; }
-      .right-col { grid-template-columns: 1fr 1fr; }
+    .session-grid .s-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2px 0;
     }
+
+    .session-grid .s-key {
+      color: var(--text-2);
+      font-weight: 300;
+    }
+
+    .session-grid .s-val {
+      color: var(--text-0);
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .s-val.expiry-warn {
+      color: var(--yellow);
+    }
+
+    .s-val.expiry-crit {
+      color: var(--red);
+      animation: expiryPulse 0.8s ease-in-out infinite;
+    }
+
+    @keyframes expiryPulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0.5
+      }
+    }
+
+    /* ── Error pill ─── */
+    .error-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 8px;
+      background: var(--red-dim);
+      color: var(--red);
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid rgba(255, 69, 58, 0.3);
+    }
+
+    /* ── Responsive ─── */
+    @media (max-width: 1024px) {
+      .app {
+        padding: 24px 20px 40px;
+      }
+
+      .main-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .presets {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
     @media (max-width: 768px) {
-      .app { padding: 14px 12px 30px; }
-      .controls-bar { grid-template-columns: 1fr; }
-      .controls-bar select { width: 100%; }
-      .presets { grid-template-columns: 1fr 1fr; }
-      .right-col { grid-template-columns: 1fr; }
-      .pipeline-svg { overflow: visible; }
-    }
-    @media (max-width: 480px) {
-      .presets { grid-template-columns: 1fr; }
+      .app {
+        padding: 16px 14px 32px;
+      }
+
+      .header h1 {
+        font-size: 2rem;
+      }
+
+      .presets {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .controls-row {
+        flex-direction: column;
+      }
+
+      .input-wrap {
+        min-width: 100%;
+      }
+
+      .id-card {
+        margin: 16px auto 0;
+        padding: 20px 24px;
+      }
+
+      .mic-btn {
+        width: 64px;
+        height: 64px;
+      }
     }
 
-    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+    @media (max-width: 480px) {
+      .presets {
+        grid-template-columns: 1fr;
+      }
+
+      .header h1 {
+        font-size: 1.5rem;
+      }
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 2px;
+    }
+
+    ::selection {
+      background: rgba(10, 132, 255, 0.3);
+    }
+
+    .section-divider {
+      height: 1px;
+      background: var(--glass-border);
+      margin: 20px 0;
+    }
+
+    /* Empty state */
+    .empty-state {
+      color: var(--text-3);
+      font-size: 13px;
+      font-weight: 300;
+      text-align: center;
+      padding: 24px 0;
+    }
+
+    /* ── Analytics Dashboard ─── */
+    .analytics-section {
+      margin-top: 32px;
+    }
+
+    .analytics-section .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-2);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .analytics-section .section-title::before {
+      content: '';
+      width: 3px;
+      height: 14px;
+      border-radius: 2px;
+      background: linear-gradient(to bottom, var(--blue), var(--purple));
+    }
+
+    /* Metrics grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .metric-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 18px 16px;
+      text-align: center;
+      transition: border-color 0.3s, transform 0.2s;
+    }
+
+    .metric-card:hover {
+      border-color: rgba(255, 255, 255, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .metric-card .metric-value {
+      font-size: 1.75rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-card .metric-value.blue {
+      color: var(--blue);
+    }
+
+    .metric-card .metric-value.green {
+      color: var(--green);
+    }
+
+    .metric-card .metric-value.yellow {
+      color: var(--yellow);
+    }
+
+    .metric-card .metric-value.purple {
+      color: var(--purple);
+    }
+
+    .metric-card .metric-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-2);
+      margin-top: 6px;
+    }
+
+    .metric-card .metric-sub {
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--text-3);
+      margin-top: 2px;
+      font-family: var(--mono);
+    }
+
+    /* Percentile bar */
+    .percentile-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .pctl-card {
+      background: var(--glass-inner);
+      border-radius: 12px;
+      padding: 14px 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pctl-card .pctl-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-2);
+      margin-bottom: 6px;
+    }
+
+    .pctl-card .pctl-value {
+      font-size: 1.3rem;
+      font-weight: 600;
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums;
+      color: var(--text-0);
+    }
+
+    .pctl-card .pctl-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 3px;
+      border-radius: 0 2px 0 0;
+      transition: width 0.5s var(--ease);
+    }
+
+    /* Analytics sub-grid: chart + intent breakdown */
+    .analytics-panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .analytics-sub-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 18px 16px;
+    }
+
+    .analytics-sub-card .sub-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-2);
+      margin-bottom: 14px;
+    }
+
+    /* Sparkline canvas */
+    #sparkCanvas {
+      width: 100%;
+      height: 64px;
+      display: block;
+      border-radius: 8px;
+    }
+
+    /* Intent breakdown bars */
+    .intent-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .intent-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .intent-row .intent-name {
+      width: 100px;
+      color: var(--text-1);
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 0;
+    }
+
+    .intent-row .intent-bar-bg {
+      flex: 1;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.04);
+      overflow: hidden;
+    }
+
+    .intent-row .intent-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.5s var(--ease);
+    }
+
+    .intent-row .intent-count {
+      width: 28px;
+      text-align: right;
+      color: var(--text-2);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+
+    /* Request history table */
+    .history-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .history-table thead th {
+      font-weight: 700;
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-2);
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--glass-border);
+      position: sticky;
+      top: 0;
+      background: var(--bg-black);
+      z-index: 1;
+    }
+
+    .history-table tbody td {
+      padding: 7px 10px;
+      color: var(--text-1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .history-table tbody tr {
+      transition: background 0.2s;
+    }
+
+    .history-table tbody tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .history-scroll {
+      max-height: 200px;
+      overflow-y: auto;
+      border-radius: 10px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.06) transparent;
+    }
+
+    .history-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .history-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .history-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 2px;
+    }
+
+    /* Status pill */
+    .status-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .status-dot.s-ok {
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green-glow);
+    }
+
+    .status-dot.s-err {
+      background: var(--red);
+      box-shadow: 0 0 6px var(--red-glow);
+    }
+
+    .status-dot.s-pcc {
+      background: var(--yellow);
+      box-shadow: 0 0 6px var(--yellow-glow);
+    }
+
+    /* Responsive analytics */
+    @media (max-width: 1024px) {
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .analytics-panels {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .metrics-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .percentile-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .metrics-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Sleeker header title */
+    .header h1 .title-gradient {
+      background: linear-gradient(135deg, var(--blue), var(--purple) 50%, var(--blue));
+      background-size: 200% 100%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: titleShimmer 4s ease infinite;
+    }
+
+    @keyframes titleShimmer {
+      0% {
+        background-position: 0% 50%;
+      }
+
+      50% {
+        background-position: 100% 50%;
+      }
+
+      100% {
+        background-position: 0% 50%;
+      }
+    }
   </style>
 </head>
+
 <body>
-  <div class="app">
+  <!-- Boot overlay -->
+  <div id="bootOverlay">
+    <div class="boot-title">Real Time Voice MCP</div>
+    <div class="boot-sub">Live Speech Recognition · Attention-Based Routing Engine</div>
+  </div>
+
+  <!-- Star field -->
+  <canvas id="starCanvas"></canvas>
+
+  <div class="app" id="appShell">
     <!-- Header -->
     <div class="header">
-      <div class="header-icon">
-        <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm-1 14.93A7.01 7.01 0 0 1 5 9h2a5 5 0 0 0 10 0h2a7.01 7.01 0 0 1-6 6.93V20h4v2H7v-2h4v-4.07z"/></svg>
-      </div>
-      <div>
-        <h1>Voice Agent Pipeline</h1>
-        <p>Interactive simulation of the full voice-agent flow from wake-word to response.</p>
+      <h1><span class="title-gradient">Real Time Voice MCP</span></h1>
+      <p class="subtitle">Live Speech Recognition · Attention-Based Routing Engine</p>
+      <div class="gradient-badge">Built by Vijay Arvind</div>
+
+      <!-- Engineer Identity Card -->
+      <div class="id-card">
+        <div class="id-role">◈ Pipeline Architect</div>
+        <div class="id-name">Vijay Arvind Ramamoorthy</div>
+        <div class="id-skills">Attention-Based Routing · MCP Dispatch<br>Innovation Engineering · Privacy-First</div>
+        <div class="id-live">
+          <span class="id-live-dot" id="liveDot"></span>
+          <span id="liveLabel">LIVE SESSION</span>
+          <span style="margin-left:auto; font-variant-numeric:tabular-nums" id="stageCount">0 / 8 stages</span>
+        </div>
+        <div class="id-progress" id="idProgress">
+          <div class="prog-step" data-stage="0"></div>
+          <div class="prog-step" data-stage="1"></div>
+          <div class="prog-step" data-stage="2"></div>
+          <div class="prog-step" data-stage="3"></div>
+          <div class="prog-step" data-stage="4"></div>
+          <div class="prog-step" data-stage="5"></div>
+          <div class="prog-step" data-stage="6"></div>
+          <div class="prog-step" data-stage="7"></div>
+        </div>
       </div>
     </div>
 
-    <!-- Controls -->
-    <div class="card" style="margin-bottom: 16px;">
-      <div class="controls-bar">
-        <label class="sr-only" for="commandInput">Command</label>
-        <input id="commandInput" type="text" placeholder="Type a voice command..." value="Set a timer for 10 minutes" />
+    <!-- Mic + Controls -->
+    <div class="card controls-card">
+      <div class="mic-area">
+        <button class="mic-btn" id="micBtn" type="button" aria-label="Microphone">
+          <div class="mic-ring"></div>
+          <div class="mic-ring"></div>
+          <div class="mic-ring"></div>
+          <canvas id="micVisualizer" width="72" height="72"></canvas>
+          <svg viewBox="0 0 24 24">
+            <path
+              d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm-1 14.93A7.01 7.01 0 0 1 5 9h2a5 5 0 0 0 10 0h2a7.01 7.01 0 0 1-6 6.93V20h4v2H7v-2h4v-4.07z" />
+          </svg>
+        </button>
+        <div class="mic-label" id="micLabel">Tap to speak</div>
+      </div>
 
-        <label class="sr-only" for="privacyMode">Privacy Mode</label>
-        <select id="privacyMode"><option value="ON" selected>Privacy: ON</option><option value="OFF">Privacy: OFF</option></select>
-
-        <label class="sr-only" for="networkMode">Network</label>
-        <select id="networkMode"><option value="ONLINE" selected>Network: ONLINE</option><option value="OFFLINE">Network: OFFLINE</option></select>
-
+      <div class="controls-row">
+        <div class="input-wrap">
+          <label class="sr-only" for="commandInput">Command</label>
+          <input id="commandInput" type="text" placeholder="Type a voice command or tap the mic..."
+            value="Set a timer for 10 minutes" />
+          <span class="mic-icon">🎙</span>
+        </div>
+        <div class="intent-badge" id="intentBadge">
+          <svg class="conf-ring" viewBox="0 0 36 36">
+            <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3" />
+            <circle id="confArc" cx="18" cy="18" r="15" fill="none" stroke="var(--blue)" stroke-width="3"
+              stroke-dasharray="94.25" stroke-dashoffset="94.25" stroke-linecap="round" transform="rotate(-90 18 18)" />
+          </svg>
+          <span id="intentText">—</span>
+        </div>
+        <div class="toggle-group">
+          <div class="toggle-wrap">
+            <span class="toggle-label">Privacy</span>
+            <button class="toggle on" id="privacyToggle" type="button" role="switch" aria-checked="true"
+              aria-label="Privacy Mode"></button>
+          </div>
+          <div class="toggle-wrap">
+            <span class="toggle-label">Network</span>
+            <button class="toggle on" id="networkToggle" type="button" role="switch" aria-checked="true"
+              aria-label="Network Mode"></button>
+          </div>
+          <div class="toggle-wrap">
+            <span class="toggle-label">Voice</span>
+            <button class="toggle on" id="ttsToggle" type="button" role="switch" aria-checked="true"
+              aria-label="Voice Response"></button>
+          </div>
+        </div>
         <button class="speak-btn" id="speakBtn" type="button">
-          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM5 9h2a5 5 0 0 0 10 0h2a7.01 7.01 0 0 1-6 6.93V20h4v2H7v-2h4v-4.07A7.01 7.01 0 0 1 5 9z"/></svg>
-          Speak
+          <svg viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z" />
+          </svg> Run
         </button>
       </div>
 
       <div class="presets" id="presetGrid">
-        <button class="preset-btn" type="button" data-command="Set a timer for 10 minutes" data-privacy="ON" data-network="ONLINE">
-          Set a timer for 10 minutes<small>local &middot; simple</small>
-        </button>
-        <button class="preset-btn" type="button" data-command="Play jazz on YouTube Music" data-privacy="ON" data-network="ONLINE">
-          Play jazz on YouTube Music<small>remote &middot; music</small>
-        </button>
-        <button class="preset-btn" type="button" data-command="Find John's message and add follow-up meeting" data-privacy="ON" data-network="ONLINE">
-          Find John's message and add follow-up meeting<small>multi-step &middot; PCC</small>
-        </button>
-        <button class="preset-btn" type="button" data-command="Search the web for restaurants" data-privacy="ON" data-network="ONLINE">
-          Search the web for restaurants<small>privacy blocked</small>
-        </button>
+        <button class="preset-btn" type="button" data-command="Set a timer for 5 minutes" data-privacy="ON"
+          data-network="ONLINE">⏱ Set a timer<small>local · timer</small></button>
+        <button class="preset-btn" type="button" data-command="What's the weather" data-privacy="ON"
+          data-network="ONLINE">🌤 Weather<small>remote · live data</small></button>
+        <button class="preset-btn" type="button" data-command="Play jazz on YouTube Music" data-privacy="ON"
+          data-network="ONLINE">🎵 Play music<small>remote · youtube</small></button>
+        <button class="preset-btn" type="button" data-command="Take a screenshot" data-privacy="ON"
+          data-network="ONLINE">📸 Screenshot<small>local · capture</small></button>
+        <button class="preset-btn" type="button" data-command="What's my battery level" data-privacy="ON"
+          data-network="ONLINE">🔋 System info<small>local · sysctl</small></button>
+        <button class="preset-btn" type="button" data-command="Remind me to buy groceries" data-privacy="ON"
+          data-network="ONLINE">📌 Reminder<small>local · Reminders.app</small></button>
+        <button class="preset-btn" type="button" data-command="Set a timer and play jazz" data-privacy="ON"
+          data-network="ONLINE">⛓ Multi-chain<small>timer + music</small></button>
+        <button class="preset-btn" type="button" data-command="Search the web for restaurants" data-privacy="ON"
+          data-network="ONLINE">🔍 Web search<small>privacy test</small></button>
       </div>
     </div>
 
@@ -411,108 +1546,79 @@
           <div class="panel-label">Visual Pipeline</div>
           <div class="pipeline-wrap">
             <svg class="pipeline-svg" viewBox="0 0 820 220" xmlns="http://www.w3.org/2000/svg">
-              <!-- Top row stages -->
               <g class="stage-node idle" id="stage-invocation">
-                <rect class="stage-rect" x="5" y="10" width="140" height="60" />
-                <text class="stage-label" x="75" y="37">INVOCATION</text>
-                <text class="stage-sub" x="75" y="54">Wake + score</text>
+                <rect class="stage-rect" x="5" y="10" width="140" height="60" /><text class="stage-label" x="75"
+                  y="37">INVOCATION</text><text class="stage-sub" x="75" y="52">Wake + score</text>
               </g>
-
-              <!-- Connection: invocation -> asr -->
               <line class="conn-line" id="conn-0" x1="145" y1="40" x2="195" y2="40" />
               <polygon class="conn-arrow" id="arrow-0" points="192,36 200,40 192,44" />
               <circle class="flow-particle" id="particle-0" cx="145" cy="40" />
-
               <g class="stage-node idle" id="stage-asr">
-                <rect class="stage-rect" x="200" y="10" width="140" height="60" />
-                <text class="stage-label" x="270" y="37">ASR</text>
-                <text class="stage-sub" x="270" y="54">Transcript</text>
+                <rect class="stage-rect" x="200" y="10" width="140" height="60" /><text class="stage-label" x="270"
+                  y="37">ASR</text><text class="stage-sub" x="270" y="52">Transcript</text>
               </g>
-
-              <!-- Connection: asr -> attention -->
               <line class="conn-line" id="conn-1" x1="340" y1="40" x2="390" y2="40" />
               <polygon class="conn-arrow" id="arrow-1" points="387,36 395,40 387,44" />
               <circle class="flow-particle" id="particle-1" cx="340" cy="40" />
-
               <g class="stage-node idle" id="stage-attention">
-                <rect class="stage-rect" x="395" y="10" width="140" height="60" />
-                <text class="stage-label" x="465" y="37">ATTENTION</text>
-                <text class="stage-sub" x="465" y="54">Intent + conf</text>
+                <rect class="stage-rect" x="395" y="10" width="140" height="60" /><text class="stage-label" x="465"
+                  y="37">ATTENTION</text><text class="stage-sub" x="465" y="52">Intent + conf</text>
               </g>
-
-              <!-- Connection: attention -> privacy -->
               <line class="conn-line" id="conn-2" x1="535" y1="40" x2="585" y2="40" />
               <polygon class="conn-arrow" id="arrow-2" points="582,36 590,40 582,44" />
               <circle class="flow-particle" id="particle-2" cx="535" cy="40" />
-
               <g class="stage-node idle" id="stage-privacy">
-                <rect class="stage-rect" x="590" y="10" width="155" height="60" />
-                <text class="stage-label" x="667" y="37">PRIVACY GATE</text>
-                <text class="stage-sub" x="667" y="54">Policy check</text>
+                <rect class="stage-rect" x="590" y="10" width="155" height="60" /><text class="stage-label" x="667"
+                  y="37">PRIVACY GATE</text><text class="stage-sub" x="667" y="52">Policy check</text>
               </g>
-
-              <!-- Connection: privacy -> router (vertical) -->
               <line class="conn-line" id="conn-3" x1="667" y1="70" x2="667" y2="140" />
               <polygon class="conn-arrow" id="arrow-3" points="663,137 667,147 671,137" />
               <circle class="flow-particle" id="particle-3" cx="667" cy="70" />
-
-              <!-- Bottom row stages (right to left) -->
               <g class="stage-node idle" id="stage-router">
-                <rect class="stage-rect" x="590" y="150" width="155" height="60" />
-                <text class="stage-label" x="667" y="177">ROUTER</text>
-                <text class="stage-sub" x="667" y="194">Path select</text>
+                <rect class="stage-rect" x="590" y="150" width="155" height="60" /><text class="stage-label" x="667"
+                  y="177">ROUTER</text><text class="stage-sub" x="667" y="192">Path select</text>
               </g>
-
-              <!-- Connection: router -> mcp -->
               <line class="conn-line" id="conn-4" x1="590" y1="180" x2="540" y2="180" />
               <polygon class="conn-arrow" id="arrow-4" points="543,176 535,180 543,184" />
               <circle class="flow-particle" id="particle-4" cx="590" cy="180" />
-
               <g class="stage-node idle" id="stage-mcp">
-                <rect class="stage-rect" x="395" y="150" width="140" height="60" />
-                <text class="stage-label" x="465" y="177">MCP SERVER</text>
-                <text class="stage-sub" x="465" y="194">Tool call</text>
+                <rect class="stage-rect" x="395" y="150" width="140" height="60" /><text class="stage-label" x="465"
+                  y="177">MCP SERVER</text><text class="stage-sub" x="465" y="192">Tool call</text>
               </g>
-
-              <!-- Connection: mcp -> execution -->
               <line class="conn-line" id="conn-5" x1="395" y1="180" x2="345" y2="180" />
               <polygon class="conn-arrow" id="arrow-5" points="348,176 340,180 348,184" />
               <circle class="flow-particle" id="particle-5" cx="395" cy="180" />
-
               <g class="stage-node idle" id="stage-execution">
-                <rect class="stage-rect" x="200" y="150" width="140" height="60" />
-                <text class="stage-label" x="270" y="177">EXECUTION</text>
-                <text class="stage-sub" x="270" y="194">Action run</text>
+                <rect class="stage-rect" x="200" y="150" width="140" height="60" /><text class="stage-label" x="270"
+                  y="177">EXECUTION</text><text class="stage-sub" x="270" y="192">Action run</text>
               </g>
-
-              <!-- Connection: execution -> response -->
               <line class="conn-line" id="conn-6" x1="200" y1="180" x2="150" y2="180" />
               <polygon class="conn-arrow" id="arrow-6" points="153,176 145,180 153,184" />
               <circle class="flow-particle" id="particle-6" cx="200" cy="180" />
-
               <g class="stage-node idle" id="stage-response">
-                <rect class="stage-rect" x="5" y="150" width="140" height="60" />
-                <text class="stage-label" x="75" y="177">RESPONSE</text>
-                <text class="stage-sub" x="75" y="194">User output</text>
+                <rect class="stage-rect" x="5" y="150" width="140" height="60" /><text class="stage-label" x="75"
+                  y="177">RESPONSE</text><text class="stage-sub" x="75" y="192">User output</text>
               </g>
             </svg>
           </div>
-
           <div class="legend">
-            <span class="legend-chip"><span class="legend-dot" style="background:var(--ok)"></span>Success</span>
-            <span class="legend-chip"><span class="legend-dot" style="background:var(--err)"></span>Blocked / Failed</span>
-            <span class="legend-chip"><span class="legend-dot" style="background:var(--pcc)"></span>PCC Route</span>
-            <span class="legend-chip"><span class="legend-dot" style="background:var(--active)"></span>Active</span>
+            <span class="legend-chip"><span class="legend-dot" style="background:var(--green)"></span>Success</span>
+            <span class="legend-chip"><span class="legend-dot" style="background:var(--red)"></span>Blocked /
+              Failed</span>
+            <span class="legend-chip"><span class="legend-dot" style="background:var(--yellow)"></span>PCC Route</span>
+            <span class="legend-chip"><span class="legend-dot" style="background:var(--blue)"></span>Active</span>
           </div>
-
-          <div class="panel-label" style="margin-top: 18px;">Stage-by-Stage Output</div>
-          <div class="log-panel" id="logPanel" aria-live="polite"></div>
+          <div class="section-divider"></div>
+          <div class="panel-label">Stage Output</div>
+          <div class="log-panel" id="logPanel" aria-live="polite">
+            <div class="empty-state">Awaiting your first command ↑</div>
+          </div>
         </div>
       </div>
 
       <!-- Right Column -->
-      <aside class="right-col">
-        <div class="card">
+      <aside>
+        <div class="card" style="margin-bottom:24px">
           <div class="panel-label">MCP Server Registry</div>
           <div id="serverList" class="server-list"></div>
         </div>
@@ -522,378 +1628,787 @@
             <div class="s-row"><span class="s-key">Session ID</span><span class="s-val" id="session-id"></span></div>
             <div class="s-row"><span class="s-key">Active</span><span class="s-val" id="session-active"></span></div>
             <div class="s-row"><span class="s-key">Turns</span><span class="s-val" id="session-turns">0</span></div>
-            <div class="s-row"><span class="s-key">Last entity</span><span class="s-val" id="session-entity">none</span></div>
-            <div class="s-row"><span class="s-key">Expires in</span><span class="s-val" id="session-expiry">0s</span></div>
+            <div class="s-row"><span class="s-key">Last entity</span><span class="s-val" id="session-entity">none</span>
+            </div>
+            <div class="s-row"><span class="s-key">Expires in</span><span class="s-val" id="session-expiry">0s</span>
+            </div>
           </div>
         </div>
       </aside>
     </div>
+
+    <!-- Analytics Dashboard -->
+    <div class="analytics-section" id="analyticsSection">
+      <div class="section-title">Pipeline Insights</div>
+
+      <!-- Metric cards -->
+      <div class="metrics-grid" id="metricsGrid">
+        <div class="metric-card">
+          <div class="metric-value blue" id="m-total">0</div>
+          <div class="metric-label">Total Runs</div>
+          <div class="metric-sub" id="m-rate">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value green" id="m-success">—</div>
+          <div class="metric-label">Success Rate</div>
+          <div class="metric-sub" id="m-success-n">0 succeeded</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value yellow" id="m-conf">—</div>
+          <div class="metric-label">Avg Confidence</div>
+          <div class="metric-sub" id="m-conf-range">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value purple" id="m-latency">—</div>
+          <div class="metric-label">Avg Latency</div>
+          <div class="metric-sub" id="m-latency-range">—</div>
+        </div>
+      </div>
+
+      <!-- Percentile bars -->
+      <div class="percentile-row" id="percentileRow">
+        <div class="pctl-card">
+          <div class="pctl-label">P50 Latency</div>
+          <div class="pctl-value" id="p50">—</div>
+          <div class="pctl-bar" id="p50bar" style="width:0; background:var(--green)"></div>
+        </div>
+        <div class="pctl-card">
+          <div class="pctl-label">P90 Latency</div>
+          <div class="pctl-value" id="p90">—</div>
+          <div class="pctl-bar" id="p90bar" style="width:0; background:var(--yellow)"></div>
+        </div>
+        <div class="pctl-card">
+          <div class="pctl-label">P99 Latency</div>
+          <div class="pctl-value" id="p99">—</div>
+          <div class="pctl-bar" id="p99bar" style="width:0; background:var(--red)"></div>
+        </div>
+      </div>
+
+      <!-- Charts + Intent distribution -->
+      <div class="analytics-panels">
+        <div class="analytics-sub-card">
+          <div class="sub-title">Latency Trend</div>
+          <canvas id="sparkCanvas" height="64"></canvas>
+        </div>
+        <div class="analytics-sub-card">
+          <div class="sub-title">Intent Distribution</div>
+          <div id="intentBreakdown">
+            <div class="empty-state">No data yet</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Request history -->
+      <div class="card">
+        <div class="panel-label">Request History</div>
+        <div class="history-scroll">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Command</th>
+                <th>Intent</th>
+                <th>Confidence</th>
+                <th>Route</th>
+                <th>Latency</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody">
+              <tr>
+                <td colspan="7" class="empty-state">No requests yet — run a command above</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
-  (function () {
-    /* ── Constants ────────────────────────────────────────────── */
-    const STAGE_IDS = [
-      "invocation", "asr", "attention", "privacy",
-      "router", "mcp", "execution", "response"
-    ];
-    const STAGE_LABELS = {
-      invocation: "INVOCATION", asr: "ASR", attention: "ATTENTION",
-      privacy: "PRIVACY", router: "ROUTER", mcp: "MCP",
-      execution: "EXECUTION", response: "RESPONSE"
-    };
+    (function () {
+      /* ── Boot sequence ─── */
+      const boot = document.getElementById('bootOverlay');
+      const canvas = document.getElementById('starCanvas');
+      const appShell = document.getElementById('appShell');
+      setTimeout(() => { boot.classList.add('fade-out'); canvas.classList.add('visible'); appShell.classList.add('revealed'); }, 1500);
+      setTimeout(() => boot.remove(), 2200);
 
-    // Connection index that fires BEFORE the target stage activates.
-    // Maps: index in pipeline flow -> connection SVG index
-    // Flow: invocation(0) -conn0-> asr(1) -conn1-> attention(2) -conn2-> privacy(3)
-    //       -conn3(vert)-> router(4) -conn4-> mcp(5) -conn5-> execution(6) -conn6-> response(7)
-    const CONN_BEFORE_STAGE = {
-      1: 0,  // before asr
-      2: 1,  // before attention
-      3: 2,  // before privacy
-      4: 3,  // before router (vertical)
-      5: 4,  // before mcp
-      6: 5,  // before execution
-      7: 6   // before response
-    };
-
-    const SERVERS = [
-      { id: "com.apple.timer.mcp",     scope: "LOCAL",  needsNetwork: false },
-      { id: "com.apple.calendar.mcp",  scope: "LOCAL",  needsNetwork: false },
-      { id: "com.apple.messages.mcp",  scope: "LOCAL",  needsNetwork: false },
-      { id: "com.google.youtubemusic", scope: "REMOTE", needsNetwork: true },
-      { id: "com.apple.maps.mcp",      scope: "REMOTE", needsNetwork: true }
-    ];
-
-    /* ── DOM refs ─────────────────────────────────────────────── */
-    const $ = (sel) => document.querySelector(sel);
-    const dom = {
-      input:      $("#commandInput"),
-      privacy:    $("#privacyMode"),
-      network:    $("#networkMode"),
-      speak:      $("#speakBtn"),
-      logs:       $("#logPanel"),
-      presets:    $("#presetGrid"),
-      serverList: $("#serverList"),
-      sId:        $("#session-id"),
-      sActive:    $("#session-active"),
-      sTurns:     $("#session-turns"),
-      sEntity:    $("#session-entity"),
-      sExpiry:    $("#session-expiry"),
-      stages: {},
-      conns: [],
-      arrows: [],
-      particles: []
-    };
-
-    STAGE_IDS.forEach((id) => {
-      dom.stages[id] = document.getElementById("stage-" + id);
-    });
-    for (let i = 0; i <= 6; i++) {
-      dom.conns[i]     = document.getElementById("conn-" + i);
-      dom.arrows[i]    = document.getElementById("arrow-" + i);
-      dom.particles[i] = document.getElementById("particle-" + i);
-    }
-
-    /* ── Session state ────────────────────────────────────────── */
-    const session = { id: uid(), turns: 0, lastEntity: "none", expiresIn: 95, active: true };
-    let running = false;
-    let runCounter = 0;
-
-    /* ── Init ─────────────────────────────────────────────────── */
-    renderSession();
-    renderServers();
-    resetAll();
-    addLog("SYSTEM", "Pipeline ready. Choose a preset or type a command.", "ok", false);
-
-    setInterval(() => {
-      if (session.expiresIn > 0) session.expiresIn--;
-      session.active = session.expiresIn > 0;
-      renderSession();
-    }, 1000);
-
-    /* ── Event listeners ──────────────────────────────────────── */
-    dom.speak.addEventListener("click", () => runPipeline(dom.input.value));
-    dom.input.addEventListener("keydown", (e) => { if (e.key === "Enter") runPipeline(dom.input.value); });
-    dom.privacy.addEventListener("change", renderServers);
-    dom.network.addEventListener("change", renderServers);
-
-    dom.presets.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-command]");
-      if (!btn) return;
-      dom.input.value   = btn.dataset.command;
-      dom.privacy.value  = btn.dataset.privacy;
-      dom.network.value  = btn.dataset.network;
-      renderServers();
-      runPipeline(btn.dataset.command);
-    });
-
-    /* ── Pipeline runner ──────────────────────────────────────── */
-    async function runPipeline(raw) {
-      if (running) return;
-      const cmd = (raw || "").trim();
-      if (!cmd) { addLog("SYSTEM", "Enter a command first.", "err", true); return; }
-
-      running = true;
-      setDisabled(true);
-      runCounter++;
-      const rid = runCounter;
-
-      resetAll();
-      clearLogs();
-      session.turns++;
-      session.expiresIn = 95;
-      session.active = true;
-      renderSession();
-
-      const env = { privacyMode: dom.privacy.value, networkMode: dom.network.value };
-      addLog("SYSTEM", "Turn " + session.turns + " started.", "ok", false);
-
-      // ── 1. INVOCATION
-      if (!await stage(0, "invocation", "ok", "confidence: " + wakeScore(cmd).toFixed(2) + " \u2192 WAKE", rid)) return done();
-
-      // ── 2. ASR
-      const transcript = normalise(cmd);
-      if (!await stage(1, "asr", "ok", "\u201c" + transcript + "\u201d", rid)) return done();
-
-      // ── 3. ATTENTION
-      const plan = classify(transcript);
-      const attSt = plan.routeType === "pcc" ? "pcc" : plan.supported ? "ok" : "err";
-      if (!await stage(2, "attention", attSt, plan.intent + " \u00B7 confidence: " + plan.confidence.toFixed(2), rid)) return done();
-      if (!plan.supported) { await failFrom(3, rid, "No matched intent for command."); return done(); }
-
-      // ── 4. PRIVACY GATE
-      const priv = privacyCheck(plan, env);
-      const privSt = priv.approved ? (plan.routeType === "pcc" ? "pcc" : "ok") : "err";
-      if (!await stage(3, "privacy", privSt, priv.label, rid)) return done();
-      if (!priv.approved) { await failFrom(4, rid, priv.label); return done(); }
-
-      // ── 5. ROUTER
-      const route = routeCheck(plan, env);
-      const routeSt = route.ok ? (route.routeType === "pcc" ? "pcc" : "ok") : "err";
-      if (!await stage(4, "router", routeSt, route.label, rid)) return done();
-      if (!route.ok) { await failFrom(5, rid, route.label); return done(); }
-
-      // ── 6. MCP SERVER (with server highlight)
-      const latency = randInt(2, 6) + (route.servers.length - 1) * randInt(2, 4);
-      for (const sid of route.servers) {
-        const row = dom.serverList.querySelector('[data-sid="' + sid + '"]');
-        if (row) { row.classList.add("hit"); setTimeout(() => row.classList.remove("hit"), 900); }
-        await sleep(250);
+      /* ── Star field ─── */
+      const sCtx = canvas.getContext('2d');
+      let stars = [];
+      function initStars() {
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        stars = Array.from({ length: 120 }, () => ({
+          x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+          r: Math.random() * 1.2 + 0.3, a: Math.random(), s: Math.random() * 0.003 + 0.001
+        }));
       }
-      const mcpSt = route.routeType === "pcc" ? "pcc" : "ok";
-      if (!await stage(5, "mcp", mcpSt, route.servers.join(" + ") + " \u00B7 " + latency + "ms", rid)) return done();
-
-      // ── 7. EXECUTION
-      const exec = execute(plan);
-      const execSt = route.routeType === "pcc" ? "pcc" : "ok";
-      if (!await stage(6, "execution", execSt, exec.log, rid)) return done();
-      session.lastEntity = exec.entityId;
-      renderSession();
-
-      // ── 8. RESPONSE
-      const respSt = route.routeType === "pcc" ? "pcc" : "ok";
-      await stage(7, "response", respSt, "\u201c" + exec.response + "\u201d", rid);
-      done();
-    }
-
-    /* ── Stage animation (activate connection, then stage) ──── */
-    async function stage(idx, id, status, text, rid) {
-      if (runCounter !== rid) return false;
-
-      // Light up incoming connection
-      const connIdx = CONN_BEFORE_STAGE[idx];
-      if (connIdx !== undefined) {
-        litConn(connIdx, "active");
-        animateParticle(connIdx);
-        await sleep(200);
+      function drawStars() {
+        sCtx.clearRect(0, 0, canvas.width, canvas.height);
+        stars.forEach(s => {
+          s.a += s.s; if (s.a > 1) s.s = -Math.abs(s.s); if (s.a < 0.1) s.s = Math.abs(s.s);
+          sCtx.beginPath(); sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          sCtx.fillStyle = `rgba(255,255,255,${s.a * 0.4})`; sCtx.fill();
+        });
+        requestAnimationFrame(drawStars);
       }
+      initStars(); drawStars();
+      window.addEventListener('resize', initStars);
 
-      // Activate stage
-      setStage(id, "active");
-      await sleep(380);
-      if (runCounter !== rid) return false;
+      /* ── Constants ─── */
+      const STAGE_IDS = ["invocation", "asr", "attention", "privacy", "router", "mcp", "execution", "response"];
+      const STAGE_LABELS = { invocation: "INVOCATION", asr: "ASR", attention: "ATTENTION", privacy: "PRIVACY", router: "ROUTER", mcp: "MCP", execution: "EXECUTION", response: "RESPONSE" };
+      const CONN_BEFORE_STAGE = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6 };
+      const SERVERS = [
+        { id: "com.apple.timer.mcp", scope: "LOCAL", needsNetwork: false, color: "var(--green)" },
+        { id: "com.apple.calendar.mcp", scope: "LOCAL", needsNetwork: false, color: "var(--blue)" },
+        { id: "com.apple.messages.mcp", scope: "LOCAL", needsNetwork: false, color: "var(--purple)" },
+        { id: "com.google.youtubemusic", scope: "REMOTE", needsNetwork: true, color: "var(--red)" },
+        { id: "com.apple.maps.mcp", scope: "REMOTE", needsNetwork: true, color: "var(--yellow)" }
+      ];
 
-      // Resolve stage
-      setStage(id, statusClass(status));
-      if (connIdx !== undefined) litConn(connIdx, status);
-      addLog(STAGE_LABELS[id], text, status, true);
-      await sleep(160);
-      return true;
-    }
+      /* ── DOM ─── */
+      const $ = s => document.querySelector(s);
+      const dom = {
+        input: $('#commandInput'), speak: $('#speakBtn'), logs: $('#logPanel'),
+        presets: $('#presetGrid'), serverList: $('#serverList'),
+        sId: $('#session-id'), sActive: $('#session-active'), sTurns: $('#session-turns'),
+        sEntity: $('#session-entity'), sExpiry: $('#session-expiry'),
+        micBtn: $('#micBtn'), micLabel: $('#micLabel'), micVis: $('#micVisualizer'),
+        intentBadge: $('#intentBadge'), intentText: $('#intentText'), confArc: $('#confArc'),
+        privacyToggle: $('#privacyToggle'), networkToggle: $('#networkToggle'), ttsToggle: $('#ttsToggle'),
+        liveDot: $('#liveDot'), liveLabel: $('#liveLabel'), stageCount: $('#stageCount'),
+        idProgress: $('#idProgress'),
+        stages: {}, conns: [], arrows: [], particles: []
+      };
+      STAGE_IDS.forEach(id => dom.stages[id] = document.getElementById('stage-' + id));
+      for (let i = 0; i <= 6; i++) { dom.conns[i] = $('#conn-' + i); dom.arrows[i] = $('#arrow-' + i); dom.particles[i] = $('#particle-' + i); }
 
-    async function failFrom(startIdx, rid, reason) {
-      const remaining = STAGE_IDS.slice(startIdx);
-      for (let i = 0; i < remaining.length; i++) {
-        const globalIdx = startIdx + i;
-        const connIdx = CONN_BEFORE_STAGE[globalIdx];
-        if (connIdx !== undefined) litConn(connIdx, "err");
-        setStage(remaining[i], "error");
-        const msg = i === remaining.length - 1 ? "\u201c" + reason + "\u201d" : "skipped";
-        addLog(STAGE_LABELS[remaining[i]], msg, "err", true);
-        await sleep(120);
+      /* ── Toggle logic ─── */
+      function getPrivacy() { return dom.privacyToggle.classList.contains('on') ? 'ON' : 'OFF'; }
+      function getNetwork() { return dom.networkToggle.classList.contains('on') ? 'ONLINE' : 'OFFLINE'; }
+      dom.privacyToggle.addEventListener('click', () => { dom.privacyToggle.classList.toggle('on'); dom.privacyToggle.setAttribute('aria-checked', dom.privacyToggle.classList.contains('on')); renderServers(); });
+      dom.networkToggle.addEventListener('click', () => { dom.networkToggle.classList.toggle('on'); dom.networkToggle.setAttribute('aria-checked', dom.networkToggle.classList.contains('on')); renderServers(); });
+      dom.ttsToggle.addEventListener('click', () => { dom.ttsToggle.classList.toggle('on'); dom.ttsToggle.setAttribute('aria-checked', dom.ttsToggle.classList.contains('on')); });
+      function getTTS() { return dom.ttsToggle.classList.contains('on'); }
+
+      /* ── Session ─── */
+      const session = { id: uid(), turns: 0, lastEntity: "none", expiresIn: 95, active: true };
+      let running = false, runCounter = 0, completedStages = 0, pendingMicPromise = null;
+      let pipelineStartTime = 0, currentRunMeta = null;
+
+      /* ── Web Speech API ─── */
+      let recognition = null, audioCtx = null, analyser = null, micStream = null;
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRec) {
+        recognition = new SpeechRec();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
       }
-    }
+      let classifyDebounce = null;
+      let micListening = false;
 
-    /* ── Connection & particle helpers ────────────────────────── */
-    function litConn(i, status) {
-      const cls = "lit-" + (status === "ok" ? "ok" : status === "err" ? "err" : status === "pcc" ? "pcc" : "active");
-      dom.conns[i].classList.add(cls);
-      dom.arrows[i].classList.add(cls);
-    }
-
-    function animateParticle(i) {
-      const p = dom.particles[i];
-      const line = dom.conns[i];
-      const x1 = +line.getAttribute("x1"), y1 = +line.getAttribute("y1");
-      const x2 = +line.getAttribute("x2"), y2 = +line.getAttribute("y2");
-
-      p.setAttribute("cx", x1);
-      p.setAttribute("cy", y1);
-      p.classList.add("running");
-
-      const dur = 200;
-      const start = performance.now();
-      function tick(now) {
-        const t = Math.min((now - start) / dur, 1);
-        p.setAttribute("cx", x1 + (x2 - x1) * t);
-        p.setAttribute("cy", y1 + (y2 - y1) * t);
-        if (t < 1) requestAnimationFrame(tick);
-        else p.classList.remove("running");
-      }
-      requestAnimationFrame(tick);
-    }
-
-    /* ── Intent classification (mirrors C++ logic) ───────────── */
-    function classify(text) {
-      const t = text.toLowerCase();
-      if (/timer|countdown/.test(t))
-        return { supported: true, intent: "SET_TIMER", confidence: 0.96, routeType: "local",
-                 servers: ["com.apple.timer.mcp"], privacyClass: "local_safe" };
-      if (/youtube|music|jazz|song/.test(t))
-        return { supported: true, intent: "PLAY_MUSIC", confidence: 0.93, routeType: "remote",
-                 servers: ["com.google.youtubemusic"], privacyClass: "remote_media" };
-      if (/message/.test(t) && /(follow-up|follow up|meeting|calendar)/.test(t))
-        return { supported: true, intent: "FOLLOWUP_FROM_MESSAGE", confidence: 0.91, routeType: "pcc",
-                 servers: ["com.apple.messages.mcp", "com.apple.calendar.mcp"], privacyClass: "cross_context_local" };
-      if (/search/.test(t) && /(web|restaurant|restaurants|internet)/.test(t))
-        return { supported: true, intent: "WEB_SEARCH", confidence: 0.90, routeType: "remote",
-                 servers: ["com.apple.maps.mcp"], privacyClass: "external_search" };
-      return { supported: false, intent: "UNSUPPORTED", confidence: 0.58, routeType: "none",
-               servers: [], privacyClass: "unknown" };
-    }
-
-    /* ── Privacy gate (mirrors C++ policy) ───────────────────── */
-    function privacyCheck(plan, env) {
-      if (plan.privacyClass === "external_search" && env.privacyMode === "ON")
-        return { approved: false, label: "BLOCKED \u00B7 privacy mode ON" };
-      if (plan.routeType === "local")  return { approved: true, label: "LOCAL \u00B7 approved" };
-      if (plan.routeType === "pcc")    return { approved: true, label: "PCC \u00B7 approved" };
-      if (plan.routeType === "remote") return { approved: true, label: "REMOTE \u00B7 approved" };
-      return { approved: false, label: "BLOCKED \u00B7 unsupported" };
-    }
-
-    /* ── Route evaluation (mirrors C++ routing) ──────────────── */
-    function routeCheck(plan, env) {
-      if (plan.routeType === "none")
-        return { ok: false, routeType: "none", label: "no route", servers: [] };
-      if (plan.routeType === "remote" && env.networkMode === "OFFLINE")
-        return { ok: false, routeType: "remote", label: "REMOTE \u00B7 network unavailable", servers: plan.servers };
-      return { ok: true, routeType: plan.routeType, label: plan.routeType.toUpperCase() + " route", servers: plan.servers };
-    }
-
-    /* ── Execution (mirrors C++ action dispatch) ─────────────── */
-    function execute(plan) {
-      switch (plan.intent) {
-        case "SET_TIMER":
-          return { log: "timer_id_001 \u00B7 armed for 10m", entityId: "timer_id_001", response: "Timer set for 10 minutes" };
-        case "PLAY_MUSIC":
-          return { log: "playlist_jazz_focus \u00B7 playback started", entityId: "playlist_jazz_focus", response: "Playing jazz on YouTube Music" };
-        case "FOLLOWUP_FROM_MESSAGE":
-          return { log: "meeting_id_204 \u00B7 follow-up added", entityId: "meeting_id_204", response: "Found John\u2019s message and scheduled a follow-up meeting" };
-        case "WEB_SEARCH":
-          return { log: "search_job_778 \u00B7 completed", entityId: "search_job_778", response: "I found nearby restaurants" };
-        default:
-          return { log: "no-op", entityId: session.lastEntity, response: "I could not complete that command" };
-      }
-    }
-
-    /* ── UI helpers ───────────────────────────────────────────── */
-    function setStage(id, cls) {
-      const el = dom.stages[id];
-      if (!el) return;
-      el.classList.remove("idle", "active", "success", "error", "pcc");
-      el.classList.add(cls);
-    }
-    function statusClass(s) { return s === "ok" ? "success" : s === "err" ? "error" : s === "pcc" ? "pcc" : "idle"; }
-
-    function resetAll() {
-      STAGE_IDS.forEach((id) => setStage(id, "idle"));
-      for (let i = 0; i <= 6; i++) {
-        dom.conns[i].className.baseVal = "conn-line";
-        dom.arrows[i].className.baseVal = "conn-arrow";
-        dom.particles[i].classList.remove("running");
-      }
-    }
-
-    function addLog(tag, text, status, mark) {
-      const line = document.createElement("div");
-      line.className = "log-line";
-      let m = "";
-      if (mark) {
-        if (status === "ok") m = '<span class="mark-ok">\u2713</span>';
-        else if (status === "err") m = '<span class="mark-err">\u2717</span>';
-        else if (status === "pcc") m = '<span class="mark-pcc">\u25B3</span>';
-      }
-      const pad = ("[" + tag + "]").padEnd(14);
-      line.innerHTML = '<span class="stage-tag">' + pad + '</span>  ' + esc(text) + (m ? "  " + m : "");
-      dom.logs.appendChild(line);
-      dom.logs.scrollTop = dom.logs.scrollHeight;
-    }
-    function clearLogs() { dom.logs.textContent = ""; }
-
-    function renderServers() {
-      const online = dom.network.value === "ONLINE";
-      dom.serverList.innerHTML = "";
-      SERVERS.forEach((s) => {
-        const on = s.needsNetwork ? online : true;
-        const row = document.createElement("div");
-        row.className = "server-row";
-        row.dataset.sid = s.id;
-        row.innerHTML =
-          '<span class="srv-name">' + s.id + '</span>' +
-          '<span class="srv-scope">' + s.scope + '</span>' +
-          '<span class="srv-status"><span class="srv-dot ' + (on ? "on" : "off") + '"></span>' + (on ? "online" : "offline") + '</span>';
-        dom.serverList.appendChild(row);
+      dom.micBtn.addEventListener('click', () => {
+        if (!recognition) { dom.micLabel.textContent = 'Speech API not supported'; return; }
+        if (micListening) { recognition.stop(); return; }
+        micListening = true;
+        dom.micBtn.classList.add('listening');
+        dom.micLabel.textContent = 'Listening...';
+        dom.input.value = '';
+        dom.input.classList.add('interim');
+        startAudioVis();
+        recognition.start();
       });
-    }
 
-    function renderSession() {
-      dom.sId.textContent      = session.id;
-      dom.sActive.textContent  = session.active ? "yes" : "no";
-      dom.sTurns.textContent   = session.turns;
-      dom.sEntity.textContent  = session.lastEntity;
-      dom.sExpiry.textContent  = session.expiresIn + "s";
-    }
+      if (recognition) {
+        recognition.onresult = (e) => {
+          let interim = '', final = '';
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            if (e.results[i].isFinal) final += e.results[i][0].transcript;
+            else interim += e.results[i][0].transcript;
+          }
+          if (final) {
+            dom.input.value = final;
+            dom.input.classList.remove('interim');
+            updateIntentBadge(final);
+          } else if (interim) {
+            dom.input.value = interim;
+            dom.input.classList.add('interim');
+            clearTimeout(classifyDebounce);
+            classifyDebounce = setTimeout(() => updateIntentBadge(interim), 200);
+          }
+        };
+        recognition.onend = () => {
+          micListening = false;
+          dom.micBtn.classList.remove('listening', 'processing');
+          dom.micLabel.textContent = 'Tap to speak';
+          stopAudioVis();
+          const val = dom.input.value.trim();
+          if (val && !running) {
+            dom.micBtn.classList.add('processing');
+            dom.micLabel.textContent = 'Processing...';
+            setTimeout(() => { dom.micBtn.classList.remove('processing'); dom.micLabel.textContent = 'Tap to speak'; }, 600);
+            runPipeline(val);
+          }
+        };
+        recognition.onerror = (e) => {
+          micListening = false;
+          dom.micBtn.classList.remove('listening', 'processing');
+          if (e.error !== 'no-speech') dom.micLabel.textContent = 'Mic error — try again';
+          else dom.micLabel.textContent = 'No speech detected';
+          stopAudioVis();
+        };
+      }
 
-    function setDisabled(v) {
-      dom.speak.disabled  = v;
-      dom.input.disabled  = v;
-      dom.privacy.disabled = v;
-      dom.network.disabled = v;
-      dom.presets.querySelectorAll("button").forEach((b) => b.disabled = v);
-    }
+      /* ── Audio visualizer ─── */
+      const visCtx = dom.micVis.getContext('2d');
+      let visRAF = null;
+      function startAudioVis() {
+        // Bug 8 fix: track pending promise to prevent AudioContext leaks
+        const micPromiseId = {};
+        pendingMicPromise = micPromiseId;
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+          // If mic was toggled off before promise resolved, clean up immediately
+          if (pendingMicPromise !== micPromiseId) {
+            stream.getTracks().forEach(t => t.stop());
+            return;
+          }
+          micStream = stream;
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 64;
+          audioCtx.createMediaStreamSource(stream).connect(analyser);
+          drawVis();
+        }).catch(() => { });
+      }
+      function drawVis() {
+        if (!analyser) return;
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        const w = dom.micVis.width, h = dom.micVis.height, cx = w / 2, cy = h / 2;
+        visCtx.clearRect(0, 0, w, h);
+        const bars = 24, step = (Math.PI * 2) / bars;
+        for (let i = 0; i < bars; i++) {
+          const val = (data[i % data.length] || 0) / 255;
+          const len = 6 + val * 14;
+          const angle = i * step - Math.PI / 2;
+          const r1 = Math.min(w, h) * 0.3, r2 = r1 + len;
+          visCtx.beginPath();
+          visCtx.moveTo(cx + Math.cos(angle) * r1, cy + Math.sin(angle) * r1);
+          visCtx.lineTo(cx + Math.cos(angle) * r2, cy + Math.sin(angle) * r2);
+          visCtx.strokeStyle = `rgba(10,132,255,${0.4 + val * 0.6})`;
+          visCtx.lineWidth = 2; visCtx.lineCap = 'round'; visCtx.stroke();
+        }
+        visRAF = requestAnimationFrame(drawVis);
+      }
+      function stopAudioVis() {
+        pendingMicPromise = null; // Bug 8 fix: invalidate pending promise
+        if (visRAF) cancelAnimationFrame(visRAF);
+        const w = dom.micVis.width, h = dom.micVis.height;
+        visCtx.clearRect(0, 0, w, h);
+        if (micStream) micStream.getTracks().forEach(t => t.stop());
+        if (audioCtx) audioCtx.close().catch(() => { });
+        audioCtx = null; analyser = null; micStream = null;
+      }
 
-    function done() { running = false; setDisabled(false); }
+      /* ── Intent badge ─── */
+      function updateIntentBadge(text) {
+        const plan = classify(normalise(text));
+        dom.intentText.textContent = plan.intent + ' · ' + (plan.confidence * 100).toFixed(0) + '%';
+        const circumference = 94.25;
+        dom.confArc.setAttribute('stroke-dashoffset', circumference * (1 - plan.confidence));
+        const color = plan.supported ? (plan.routeType === 'pcc' ? 'var(--yellow)' : 'var(--blue)') : 'var(--red)';
+        dom.confArc.setAttribute('stroke', color);
+      }
 
-    /* ── Utilities ────────────────────────────────────────────── */
-    function normalise(s) { const c = s.trim().replace(/\s+/g, " "); return c ? c[0].toLowerCase() + c.slice(1) : ""; }
-    function wakeScore(c) { return Math.min(0.98, 0.91 + (c.length % 5) * 0.01); }
-    function randInt(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
-    function uid() { const a = "abcdefghijklmnopqrstuvwxyz0123456789"; let o = ""; for (let i = 0; i < 6; i++) o += a[Math.floor(Math.random() * a.length)]; return o; }
-    function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
-    function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
-  })();
+      /* ── WebSocket connection ─── */
+      let ws = null, wsConnected = false;
+      function connectWS() {
+        try {
+          ws = new WebSocket('ws://localhost:8000/ws');
+          ws.onopen = () => { wsConnected = true; dom.micLabel.textContent = '● Server connected — tap to speak'; };
+          ws.onclose = () => { wsConnected = false; dom.micLabel.textContent = 'Tap to speak (offline mode)'; setTimeout(connectWS, 3000); };
+          ws.onerror = () => { wsConnected = false; };
+          ws.onmessage = (e) => { handleWSMessage(JSON.parse(e.data)); };
+        } catch (_) { wsConnected = false; setTimeout(connectWS, 3000); }
+      }
+      connectWS();
+
+      let wsResolve = null;
+      function handleWSMessage(msg) {
+        if (msg.type === 'stage') {
+          const idx = msg.index, id = msg.id, status = msg.status, text = msg.text;
+          // Capture analytics metadata from WS stages
+          if (idx === 2 && currentRunMeta) {
+            currentRunMeta.intent = msg.intent || 'UNKNOWN';
+            currentRunMeta.confidence = msg.confidence || 0;
+          }
+          if (idx === 4 && currentRunMeta) {
+            currentRunMeta.routeType = text.toLowerCase().includes('local') ? 'local' : text.toLowerCase().includes('pcc') ? 'pcc' : 'remote';
+          }
+          if (idx === 7 && currentRunMeta && status !== 'err') {
+            currentRunMeta.succeeded = true;
+          }
+          const connIdx = CONN_BEFORE_STAGE[idx];
+          if (connIdx !== undefined) { litConn(connIdx, 'active'); animateParticle(connIdx); }
+          setTimeout(() => {
+            setStage(id, 'active'); updateProgress(idx);
+            setTimeout(() => {
+              const el = dom.stages[id];
+              if (el) { el.style.animation = 'stagePopIn 0.3s var(--spring)'; setTimeout(() => el.style.animation = '', 300); }
+              setStage(id, statusClass(status));
+              if (connIdx !== undefined) litConn(connIdx, status);
+              addLog(STAGE_LABELS[id], text, status, true);
+              completedStages = idx + 1;
+              dom.stageCount.textContent = completedStages + ' / 8 stages';
+              if (msg.entityId) { session.lastEntity = msg.entityId; renderSession(); }
+              // Flash server rows
+              if (msg.servers) {
+                msg.servers.forEach(sid => {
+                  const row = dom.serverList.querySelector('[data-sid="' + sid + '"]');
+                  if (row) { row.classList.add('hit'); setTimeout(() => row.classList.remove('hit'), 900); }
+                });
+              }
+            }, 120);
+          }, 60);
+        } else if (msg.type === 'fail_from') {
+          const remaining = STAGE_IDS.slice(msg.startIndex);
+          remaining.forEach((sid, i) => {
+            setTimeout(() => {
+              const gi = msg.startIndex + i;
+              const ci = CONN_BEFORE_STAGE[gi];
+              if (ci !== undefined) litConn(ci, 'err');
+              setStage(sid, 'error'); updateProgress(gi, 'error');
+              const txt = i === remaining.length - 1 ? '\u201c' + msg.reason + '\u201d' : 'skipped';
+              addLog(STAGE_LABELS[sid], txt, 'err', true);
+            }, i * 60);
+          });
+          setTimeout(() => done(), remaining.length * 60 + 100);
+        } else if (msg.type === 'done') {
+          done();
+        }
+      }
+
+      /* ── Init ─── */
+      renderSession(); renderServers(); resetAll();
+      setInterval(() => {
+        if (session.expiresIn > 0) session.expiresIn--;
+        session.active = session.expiresIn > 0;
+        renderSession();
+      }, 1000);
+
+      /* ── Events ─── */
+      dom.speak.addEventListener('click', () => runPipeline(dom.input.value));
+      dom.input.addEventListener('keydown', e => { if (e.key === 'Enter') runPipeline(dom.input.value); });
+      dom.input.addEventListener('input', () => { updateIntentBadge(dom.input.value); });
+      dom.presets.addEventListener('click', e => {
+        const btn = e.target.closest('button[data-command]');
+        if (!btn) return;
+        dom.input.value = btn.dataset.command;
+        dom.input.classList.remove('interim');
+        // Bug 9 fix: sync aria-checked when presets change toggle state
+        if (btn.dataset.privacy === 'ON') dom.privacyToggle.classList.add('on'); else dom.privacyToggle.classList.remove('on');
+        dom.privacyToggle.setAttribute('aria-checked', btn.dataset.privacy === 'ON');
+        if (btn.dataset.network === 'ONLINE') dom.networkToggle.classList.add('on'); else dom.networkToggle.classList.remove('on');
+        dom.networkToggle.setAttribute('aria-checked', btn.dataset.network === 'ONLINE');
+        renderServers();
+        updateIntentBadge(btn.dataset.command);
+        runPipeline(btn.dataset.command);
+      });
+
+      /* ── Pipeline runner ─── */
+      async function runPipeline(raw) {
+        // Bug 3 fix: allow cancellation — new command cancels in-flight pipeline
+        const cmd = (raw || '').trim();
+        if (!cmd) { if (!running) addLog('SYSTEM', 'Enter a command first.', 'err', true); return; }
+        if (running) {
+          runCounter++; // cancel the in-flight run
+          await sleep(200); // let the old run exit
+          running = false;
+        }
+        running = true; setDisabled(true); runCounter++; completedStages = 0;
+        pipelineStartTime = performance.now();
+        currentRunMeta = { cmd, intent: 'UNKNOWN', confidence: 0, routeType: 'none', succeeded: false };
+        const rid = runCounter;
+        resetAll(); clearLogs();
+        // Bug 2 fix: regenerate session ID if session had expired
+        if (!session.active) session.id = uid();
+        session.turns++; session.expiresIn = 95; session.active = true;
+        renderSession(); updateProgress(-1);
+        dom.liveDot.classList.remove('off');
+        addLog('SYSTEM', 'Turn ' + session.turns + ' started.', 'ok', false);
+        updateIntentBadge(cmd);
+
+        // Use backend if connected
+        if (wsConnected && ws && ws.readyState === 1) {
+          addLog('SYSTEM', 'Backend connected — executing real actions', 'ok', false);
+          ws.send(JSON.stringify({ command: cmd, privacy: getPrivacy(), network: getNetwork(), tts: getTTS() }));
+          return; // stages arrive async via handleWSMessage
+        }
+
+        // Fallback: local simulation
+        addLog('SYSTEM', 'Offline mode — simulating pipeline', 'pcc', false);
+        const env = { privacyMode: getPrivacy(), networkMode: getNetwork() };
+        if (!await stage(0, 'invocation', 'ok', 'confidence: ' + wakeScore(cmd).toFixed(2) + ' → WAKE', rid)) return done();
+        const transcript = normalise(cmd);
+        if (!await stage(1, 'asr', 'ok', '\u201c' + transcript + '\u201d', rid)) return done();
+        const plan = classify(transcript);
+        const attSt = plan.routeType === 'pcc' ? 'pcc' : plan.supported ? 'ok' : 'err';
+        if (!await stage(2, 'attention', attSt, plan.intent + ' · confidence: ' + plan.confidence.toFixed(2), rid)) return done();
+        currentRunMeta.intent = plan.intent;
+        currentRunMeta.confidence = plan.confidence;
+        currentRunMeta.routeType = plan.routeType;
+        if (!plan.supported) { await failFrom(3, rid, 'No matched intent.'); return done(); }
+        const priv = privacyCheck(plan, env);
+        const privSt = priv.approved ? (plan.routeType === 'pcc' ? 'pcc' : 'ok') : 'err';
+        if (!await stage(3, 'privacy', privSt, priv.label, rid)) return done();
+        if (!priv.approved) { await failFrom(4, rid, priv.label); return done(); }
+        const route = routeCheck(plan, env);
+        const routeSt = route.ok ? (route.routeType === 'pcc' ? 'pcc' : 'ok') : 'err';
+        if (!await stage(4, 'router', routeSt, route.label, rid)) return done();
+        if (!route.ok) { await failFrom(5, rid, route.label); return done(); }
+        const latency = randInt(2, 6) + (route.servers.length - 1) * randInt(2, 4);
+        for (const sid of route.servers) {
+          const row = dom.serverList.querySelector('[data-sid="' + sid + '"]');
+          if (row) { row.classList.add('hit'); setTimeout(() => row.classList.remove('hit'), 900); }
+          await sleep(100);
+        }
+        const mcpSt = route.routeType === 'pcc' ? 'pcc' : 'ok';
+        if (!await stage(5, 'mcp', mcpSt, route.servers.join(' + ') + ' · ' + latency + 'ms', rid)) return done();
+        const exec = execute(plan);
+        const execSt = route.routeType === 'pcc' ? 'pcc' : 'ok';
+        if (!await stage(6, 'execution', execSt, exec.log, rid)) return done();
+        session.lastEntity = exec.entityId; renderSession();
+        const respSt = route.routeType === 'pcc' ? 'pcc' : 'ok';
+        await stage(7, 'response', respSt, '\u201c' + exec.response + '\u201d', rid);
+        currentRunMeta.succeeded = true;
+        done();
+      }
+
+      /* ── Stage animation ─── */
+      async function stage(idx, id, status, text, rid) {
+        if (runCounter !== rid) return false;
+        const connIdx = CONN_BEFORE_STAGE[idx];
+        if (connIdx !== undefined) { litConn(connIdx, 'active'); animateParticle(connIdx); await sleep(80); }
+        setStage(id, 'active'); updateProgress(idx);
+        await sleep(150);
+        if (runCounter !== rid) return false;
+        // Micro-interaction: pop
+        const el = dom.stages[id];
+        if (el) { el.style.animation = 'stagePopIn 0.3s var(--spring)'; setTimeout(() => el.style.animation = '', 300); }
+        setStage(id, statusClass(status));
+        if (connIdx !== undefined) litConn(connIdx, status);
+        addLog(STAGE_LABELS[id], text, status, true);
+        completedStages = idx + 1;
+        dom.stageCount.textContent = completedStages + ' / 8 stages';
+        await sleep(60);
+        return true;
+      }
+
+      async function failFrom(startIdx, rid, reason) {
+        const remaining = STAGE_IDS.slice(startIdx);
+        for (let i = 0; i < remaining.length; i++) {
+          const gi = startIdx + i;
+          const ci = CONN_BEFORE_STAGE[gi];
+          if (ci !== undefined) litConn(ci, 'err');
+          setStage(remaining[i], 'error');
+          updateProgress(gi, 'error');
+          const msg = i === remaining.length - 1 ? '\u201c' + reason + '\u201d' : 'skipped';
+          addLog(STAGE_LABELS[remaining[i]], msg, 'err', true);
+          await sleep(50);
+        }
+      }
+
+      /* ── Progress bar on ID card ─── */
+      function updateProgress(activeIdx, overrideStatus) {
+        const steps = dom.idProgress.querySelectorAll('.prog-step');
+        steps.forEach((s, i) => {
+          s.className = 'prog-step';
+          if (i < activeIdx) s.classList.add('done');
+          else if (i === activeIdx) s.classList.add(overrideStatus || 'active');
+        });
+      }
+
+      /* ── Conn & particle helpers ─── */
+      function litConn(i, status) {
+        const cls = 'lit-' + (status === 'ok' ? 'ok' : status === 'err' ? 'err' : status === 'pcc' ? 'pcc' : 'active');
+        dom.conns[i].classList.add(cls); dom.arrows[i].classList.add(cls);
+      }
+      function animateParticle(i) {
+        const p = dom.particles[i], line = dom.conns[i];
+        const x1 = +line.getAttribute('x1'), y1 = +line.getAttribute('y1'), x2 = +line.getAttribute('x2'), y2 = +line.getAttribute('y2');
+        p.setAttribute('cx', x1); p.setAttribute('cy', y1); p.classList.add('running');
+        const dur = 200, start = performance.now();
+        function tick(now) {
+          const t = Math.min((now - start) / dur, 1);
+          p.setAttribute('cx', x1 + (x2 - x1) * t); p.setAttribute('cy', y1 + (y2 - y1) * t);
+          if (t < 1) requestAnimationFrame(tick); else p.classList.remove('running');
+        }
+        requestAnimationFrame(tick);
+      }
+
+      /* ── Classification ─── */
+      function classify(text) {
+        const t = text.toLowerCase();
+        if (/timer|countdown/.test(t)) return { supported: true, intent: 'SET_TIMER', confidence: 0.96, routeType: 'local', servers: ['com.apple.timer.mcp'], privacyClass: 'local_safe' };
+        if (/youtube|music|jazz|song/.test(t)) return { supported: true, intent: 'PLAY_MUSIC', confidence: 0.93, routeType: 'remote', servers: ['com.google.youtubemusic'], privacyClass: 'remote_media' };
+        if (/message/.test(t) && /(follow-up|follow up|meeting|calendar)/.test(t)) return { supported: true, intent: 'FOLLOWUP_FROM_MESSAGE', confidence: 0.91, routeType: 'pcc', servers: ['com.apple.messages.mcp', 'com.apple.calendar.mcp'], privacyClass: 'cross_context_local' };
+        if (/search/.test(t) && /(web|restaurant|restaurants|internet)/.test(t)) return { supported: true, intent: 'WEB_SEARCH', confidence: 0.90, routeType: 'remote', servers: ['com.apple.maps.mcp'], privacyClass: 'external_search' };
+        return { supported: false, intent: 'UNSUPPORTED', confidence: 0.58, routeType: 'none', servers: [], privacyClass: 'unknown' };
+      }
+      function privacyCheck(plan, env) {
+        if (plan.privacyClass === 'external_search' && env.privacyMode === 'ON') return { approved: false, label: 'BLOCKED · privacy mode ON' };
+        if (plan.routeType === 'local') return { approved: true, label: 'LOCAL · approved' };
+        if (plan.routeType === 'pcc') return { approved: true, label: 'PCC · approved' };
+        if (plan.routeType === 'remote') return { approved: true, label: 'REMOTE · approved' };
+        return { approved: false, label: 'BLOCKED · unsupported' };
+      }
+      function routeCheck(plan, env) {
+        if (plan.routeType === 'none') return { ok: false, routeType: 'none', label: 'no route', servers: [] };
+        if (plan.routeType === 'remote' && env.networkMode === 'OFFLINE') return { ok: false, routeType: 'remote', label: 'REMOTE · network unavailable', servers: plan.servers };
+        return { ok: true, routeType: plan.routeType, label: plan.routeType.toUpperCase() + ' route', servers: plan.servers };
+      }
+      function execute(plan) {
+        switch (plan.intent) {
+          case 'SET_TIMER': return { log: 'timer_id_001 · armed for 10m', entityId: 'timer_id_001', response: 'Timer set for 10 minutes' };
+          case 'PLAY_MUSIC': return { log: 'playlist_jazz_focus · playback started', entityId: 'playlist_jazz_focus', response: 'Playing jazz on YouTube Music' };
+          case 'FOLLOWUP_FROM_MESSAGE': return { log: 'meeting_id_204 · follow-up added', entityId: 'meeting_id_204', response: 'Found John\u2019s message and scheduled a follow-up meeting' };
+          case 'WEB_SEARCH': return { log: 'search_job_778 · completed', entityId: 'search_job_778', response: 'I found nearby restaurants' };
+          default: return { log: 'no-op', entityId: session.lastEntity, response: 'I could not complete that command' };
+        }
+      }
+
+      /* ── UI helpers ─── */
+      function setStage(id, cls) {
+        const el = dom.stages[id]; if (!el) return;
+        el.classList.remove('idle', 'active', 'success', 'error', 'pcc'); el.classList.add(cls);
+      }
+      function statusClass(s) { return s === 'ok' ? 'success' : s === 'err' ? 'error' : s === 'pcc' ? 'pcc' : 'idle'; }
+      function resetAll() {
+        STAGE_IDS.forEach(id => setStage(id, 'idle'));
+        // Bug 1 fix: use setAttribute for reliable SVG class handling
+        for (let i = 0; i <= 6; i++) { dom.conns[i].setAttribute('class', 'conn-line'); dom.arrows[i].setAttribute('class', 'conn-arrow'); dom.particles[i].classList.remove('running'); }
+        dom.idProgress.querySelectorAll('.prog-step').forEach(s => s.className = 'prog-step');
+        dom.stageCount.textContent = '0 / 8 stages';
+      }
+      let logDelay = 0;
+      function addLog(tag, text, status, mark) {
+        // Remove empty state
+        const empty = dom.logs.querySelector('.empty-state'); if (empty) empty.remove();
+        const line = document.createElement('div');
+        line.className = 'log-line';
+        line.style.animationDelay = logDelay + 'ms';
+        logDelay += 40;
+        let m = '';
+        if (mark) {
+          if (status === 'ok') m = '<span class="mark-ok">✓</span>';
+          else if (status === 'err') m = '<span class="mark-err">✗</span>';
+          else if (status === 'pcc') m = '<span class="mark-pcc">△</span>';
+        }
+        const pad = ('[' + tag + ']').padEnd(14);
+        line.innerHTML = '<span class="stage-tag">' + pad + '</span>  ' + esc(text) + (m ? '  ' + m : '');
+        dom.logs.appendChild(line);
+        dom.logs.scrollTop = dom.logs.scrollHeight;
+      }
+      function clearLogs() { dom.logs.innerHTML = ''; logDelay = 0; }
+
+      function renderServers() {
+        const online = getNetwork() === 'ONLINE';
+        dom.serverList.innerHTML = '';
+        SERVERS.forEach(s => {
+          const on = s.needsNetwork ? online : true;
+          const row = document.createElement('div');
+          row.className = 'server-row'; row.dataset.sid = s.id;
+          row.innerHTML = '<span class="srv-name">' + s.id + '</span><span class="srv-scope">' + s.scope + '</span><span class="srv-status"><span class="srv-dot ' + (on ? 'on' : 'off') + '"></span>' + (on ? 'online' : 'offline') + '</span>';
+          dom.serverList.appendChild(row);
+        });
+      }
+
+      function renderSession() {
+        dom.sId.textContent = session.id;
+        dom.sActive.textContent = session.active ? 'yes' : 'no';
+        dom.sTurns.textContent = session.turns;
+        dom.sEntity.textContent = session.lastEntity;
+        const exp = dom.sExpiry;
+        exp.textContent = session.expiresIn + 's';
+        exp.className = 's-val';
+        if (session.expiresIn <= 10) exp.classList.add('expiry-crit');
+        else if (session.expiresIn <= 30) exp.classList.add('expiry-warn');
+      }
+
+      function setDisabled(v) {
+        dom.speak.disabled = v; dom.input.disabled = v; dom.micBtn.disabled = v;
+        dom.presets.querySelectorAll('button').forEach(b => b.disabled = v);
+      }
+      function done() {
+        const latMs = performance.now() - pipelineStartTime;
+        if (currentRunMeta && currentRunMeta.cmd) {
+          recordRun(currentRunMeta.cmd, currentRunMeta.intent, currentRunMeta.confidence, currentRunMeta.routeType, latMs, currentRunMeta.succeeded);
+        }
+        currentRunMeta = null;
+        running = false; setDisabled(false);
+        // Bug 2 fix: respect session.active state for live dot
+        if (session.active) dom.liveDot.classList.remove('off');
+        else dom.liveDot.classList.add('off');
+      }
+
+      /* ── Analytics Engine ─── */
+      const analytics = { runs: [], intents: {} };
+      const INTENT_COLORS = {
+        SET_TIMER: 'var(--green)', PLAY_MUSIC: 'var(--red)', FOLLOWUP_FROM_MESSAGE: 'var(--yellow)',
+        WEB_SEARCH: 'var(--purple)', GET_WEATHER: 'var(--blue)', TAKE_SCREENSHOT: 'var(--green)',
+        CLIPBOARD: 'var(--blue)', SYSTEM_INFO: 'var(--yellow)', VOLUME_CONTROL: 'var(--purple)',
+        CREATE_NOTE: 'var(--green)', CREATE_REMINDER: 'var(--blue)', OPEN_FINDER: 'var(--yellow)',
+        OPEN_MAPS: 'var(--red)', SEND_MESSAGE: 'var(--purple)', CREATE_EVENT: 'var(--blue)',
+        OPEN_APP: 'var(--green)', REPEAT_LAST: 'var(--yellow)', RECALL_HISTORY: 'var(--blue)',
+        UNSUPPORTED: 'var(--red)'
+      };
+
+      function recordRun(cmd, intent, confidence, routeType, latencyMs, succeeded) {
+        const entry = { id: analytics.runs.length + 1, cmd, intent, confidence, routeType, latencyMs, succeeded, ts: Date.now() };
+        analytics.runs.push(entry);
+        analytics.intents[intent] = (analytics.intents[intent] || 0) + 1;
+        refreshAnalytics();
+      }
+
+      function percentile(arr, p) {
+        if (!arr.length) return 0;
+        const sorted = [...arr].sort((a, b) => a - b);
+        const idx = Math.ceil(p / 100 * sorted.length) - 1;
+        return sorted[Math.max(0, idx)];
+      }
+
+      function refreshAnalytics() {
+        const runs = analytics.runs;
+        if (!runs.length) return;
+
+        // Totals
+        const total = runs.length;
+        const successes = runs.filter(r => r.succeeded).length;
+        const rate = total > 0 ? (successes / total * 100) : 0;
+        const confs = runs.map(r => r.confidence);
+        const lats = runs.map(r => r.latencyMs);
+        const avgConf = confs.reduce((a, b) => a + b, 0) / confs.length;
+        const avgLat = lats.reduce((a, b) => a + b, 0) / lats.length;
+        const minConf = Math.min(...confs);
+        const maxConf = Math.max(...confs);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+
+        // Metrics
+        document.getElementById('m-total').textContent = total;
+        document.getElementById('m-rate').textContent = (total / Math.max(1, (Date.now() - runs[0].ts) / 60000)).toFixed(1) + ' / min';
+        document.getElementById('m-success').textContent = rate.toFixed(0) + '%';
+        document.getElementById('m-success-n').textContent = successes + ' of ' + total + ' succeeded';
+        document.getElementById('m-conf').textContent = (avgConf * 100).toFixed(0) + '%';
+        document.getElementById('m-conf-range').textContent = (minConf * 100).toFixed(0) + '–' + (maxConf * 100).toFixed(0) + '%';
+        document.getElementById('m-latency').textContent = avgLat.toFixed(0) + 'ms';
+        document.getElementById('m-latency-range').textContent = minLat.toFixed(0) + '–' + maxLat.toFixed(0) + 'ms';
+
+        // Percentiles
+        const p50 = percentile(lats, 50), p90 = percentile(lats, 90), p99 = percentile(lats, 99);
+        document.getElementById('p50').textContent = p50.toFixed(0) + 'ms';
+        document.getElementById('p90').textContent = p90.toFixed(0) + 'ms';
+        document.getElementById('p99').textContent = p99.toFixed(0) + 'ms';
+        const maxP = Math.max(p99, 1);
+        document.getElementById('p50bar').style.width = (p50 / maxP * 100) + '%';
+        document.getElementById('p90bar').style.width = (p90 / maxP * 100) + '%';
+        document.getElementById('p99bar').style.width = '100%';
+
+        // Sparkline
+        drawSparkline(lats.slice(-30));
+
+        // Intent breakdown
+        const bd = document.getElementById('intentBreakdown');
+        const sorted = Object.entries(analytics.intents).sort((a, b) => b[1] - a[1]);
+        const maxCount = sorted[0] ? sorted[0][1] : 1;
+        bd.innerHTML = sorted.map(([intent, count]) => {
+          const pct = (count / maxCount * 100).toFixed(0);
+          const color = INTENT_COLORS[intent] || 'var(--blue)';
+          return '<div class="intent-row">' +
+            '<span class="intent-name">' + intent + '</span>' +
+            '<div class="intent-bar-bg"><div class="intent-bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
+            '<span class="intent-count">' + count + '</span></div>';
+        }).join('');
+
+        // History table
+        const tbody = document.getElementById('historyBody');
+        tbody.innerHTML = runs.slice().reverse().map(r => {
+          const dotCls = r.succeeded ? 's-ok' : 's-err';
+          const statusTxt = r.succeeded ? 'OK' : 'FAIL';
+          const cmdShort = r.cmd.length > 28 ? r.cmd.slice(0, 28) + '…' : r.cmd;
+          return '<tr>' +
+            '<td>' + r.id + '</td>' +
+            '<td>' + esc(cmdShort) + '</td>' +
+            '<td>' + r.intent + '</td>' +
+            '<td>' + (r.confidence * 100).toFixed(0) + '%</td>' +
+            '<td>' + r.routeType.toUpperCase() + '</td>' +
+            '<td>' + r.latencyMs.toFixed(0) + 'ms</td>' +
+            '<td><span class="status-dot ' + dotCls + '"></span>' + statusTxt + '</td></tr>';
+        }).join('');
+      }
+
+      function drawSparkline(data) {
+        const c = document.getElementById('sparkCanvas');
+        const ctx = c.getContext('2d');
+        c.width = c.offsetWidth * 2; c.height = 128;
+        ctx.clearRect(0, 0, c.width, c.height);
+        if (data.length < 2) return;
+        const max = Math.max(...data, 1);
+        const pad = 8;
+        const w = c.width - pad * 2, h = c.height - pad * 2;
+        // Gradient fill
+        const grad = ctx.createLinearGradient(0, pad, 0, c.height);
+        grad.addColorStop(0, 'rgba(108,142,239,0.2)');
+        grad.addColorStop(1, 'rgba(108,142,239,0)');
+        ctx.beginPath();
+        ctx.moveTo(pad, pad + h);
+        data.forEach((v, i) => {
+          const x = pad + (i / (data.length - 1)) * w;
+          const y = pad + h - (v / max) * h;
+          ctx.lineTo(x, y);
+        });
+        ctx.lineTo(pad + w, pad + h);
+        ctx.closePath();
+        ctx.fillStyle = grad;
+        ctx.fill();
+        // Line
+        ctx.beginPath();
+        data.forEach((v, i) => {
+          const x = pad + (i / (data.length - 1)) * w;
+          const y = pad + h - (v / max) * h;
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = 'rgba(108,142,239,0.7)';
+        ctx.lineWidth = 2;
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+        // Dots
+        data.forEach((v, i) => {
+          const x = pad + (i / (data.length - 1)) * w;
+          const y = pad + h - (v / max) * h;
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(108,142,239,0.9)';
+          ctx.fill();
+        });
+      }
+
+
+
+      /* ── Utilities ─── */
+      // Bug 4 fix: preserve original casing (classify already lowercases internally)
+      function normalise(s) { return s.trim().replace(/\s+/g, ' '); }
+      function wakeScore(c) { return Math.min(0.98, 0.91 + (c.length % 5) * 0.01); }
+      function randInt(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
+      function uid() { const a = 'abcdefghijklmnopqrstuvwxyz0123456789'; let o = ''; for (let i = 0; i < 6; i++) o += a[Math.floor(Math.random() * a.length)]; return o; }
+      function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+      // Bug 7 fix: also escape single quotes for defense-in-depth XSS protection
+      function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+    })();
   </script>
 </body>
+
 </html>
