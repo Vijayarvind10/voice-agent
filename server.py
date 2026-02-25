@@ -30,6 +30,15 @@ SERVERS = [
     {"id": "com.apple.maps.mcp",       "scope": "REMOTE", "needsNetwork": True},
     {"id": "com.apple.weather.mcp",    "scope": "REMOTE", "needsNetwork": True},
     {"id": "com.apple.websearch.mcp",  "scope": "REMOTE", "needsNetwork": True},
+    {"id": "com.apple.clock.mcp",      "scope": "LOCAL",  "needsNetwork": False},
+    {"id": "com.apple.calculator.mcp", "scope": "LOCAL",  "needsNetwork": False},
+    {"id": "com.entertainment.jokes.mcp", "scope": "LOCAL", "needsNetwork": False},
+    {"id": "com.entertainment.quotes.mcp", "scope": "LOCAL", "needsNetwork": False},
+    {"id": "com.tools.random.mcp",     "scope": "LOCAL",  "needsNetwork": False},
+    {"id": "com.reference.dictionary.mcp", "scope": "REMOTE", "needsNetwork": True},
+    {"id": "com.finance.currency.mcp", "scope": "REMOTE", "needsNetwork": True},
+    {"id": "com.network.ip.mcp",       "scope": "LOCAL",  "needsNetwork": False},
+    {"id": "com.system.uptime.mcp",    "scope": "LOCAL",  "needsNetwork": False},
 ]
 
 # ── Conversation Memory ──────────────────────────────────────────────
@@ -249,6 +258,67 @@ def classify(text: str, session_state: dict = None) -> dict:
                 "routeType": "local", "servers": ["com.apple.finder.mcp"],
                 "privacyClass": "local_safe", "params": {"app": app_name}}
 
+    # Date & Time
+    if re.search(r'\btime\b|date|day is it', t):
+        return {"supported": True, "intent": "GET_DATE_TIME", "confidence": 0.96,
+                "routeType": "local", "servers": ["com.apple.clock.mcp"],
+                "privacyClass": "local_safe", "params": {}}
+
+    # Calculator
+    if re.search(r'calculate|math|plus|minus|times|divided', t):
+        return {"supported": True, "intent": "CALCULATE", "confidence": 0.95,
+                "routeType": "local", "servers": ["com.apple.calculator.mcp"],
+                "privacyClass": "local_safe", "params": {"expression": t}}
+
+    # Joke
+    if re.search(r'joke|laugh', t):
+        return {"supported": True, "intent": "TELL_JOKE", "confidence": 0.92,
+                "routeType": "local", "servers": ["com.entertainment.jokes.mcp"],
+                "privacyClass": "local_safe", "params": {}}
+
+    # Quote
+    if re.search(r'quote|inspire|wisdom|motivation', t):
+        return {"supported": True, "intent": "GET_QUOTE", "confidence": 0.91,
+                "routeType": "local", "servers": ["com.entertainment.quotes.mcp"],
+                "privacyClass": "local_safe", "params": {}}
+
+    # Coin Flip
+    if re.search(r'flip.*coin|heads.*tails', t):
+        return {"supported": True, "intent": "FLIP_COIN", "confidence": 0.94,
+                "routeType": "local", "servers": ["com.tools.random.mcp"],
+                "privacyClass": "local_safe", "params": {}}
+
+    # Dice Roll
+    if re.search(r'roll.*(die|dice)', t):
+        return {"supported": True, "intent": "ROLL_DIE", "confidence": 0.94,
+                "routeType": "local", "servers": ["com.tools.random.mcp"],
+                "privacyClass": "local_safe", "params": {}}
+
+    # Dictionary
+    if re.search(r'define|meaning of|definition', t):
+        word = re.sub(r'(define|meaning of|definition of|what is the)\s*', '', t).strip()
+        return {"supported": True, "intent": "DEFINE_WORD", "confidence": 0.92,
+                "routeType": "remote", "servers": ["com.reference.dictionary.mcp"],
+                "privacyClass": "external_search", "params": {"word": word}}
+
+    # Currency
+    if re.search(r'convert.*(currency|usd|eur|gbp|yen)|price of', t):
+        return {"supported": True, "intent": "CONVERT_CURRENCY", "confidence": 0.90,
+                "routeType": "remote", "servers": ["com.finance.currency.mcp"],
+                "privacyClass": "external_search", "params": {"query": t}}
+
+    # Local IP
+    if re.search(r'my ip|ip address', t):
+        return {"supported": True, "intent": "GET_IP", "confidence": 0.95,
+                "routeType": "local", "servers": ["com.network.ip.mcp"],
+                "privacyClass": "local_safe", "params": {}}
+
+    # Uptime
+    if re.search(r'uptime|how long.*running', t):
+        return {"supported": True, "intent": "GET_UPTIME", "confidence": 0.93,
+                "routeType": "local", "servers": ["com.system.uptime.mcp"],
+                "privacyClass": "local_safe", "params": {}}
+
     return {"supported": False, "intent": "UNSUPPORTED", "confidence": 0.58,
             "routeType": "none", "servers": [], "privacyClass": "unknown", "params": {}}
 
@@ -426,6 +496,81 @@ def execute(plan: dict) -> dict:
         app = p.get("app", "Finder")
         subprocess.Popen(["open", "-a", app.capitalize()])
         return {"log": f"{app} · launched", "entityId": f"app_{uid()}", "response": f"Opening {app.capitalize()}"}
+
+    if intent == "GET_DATE_TIME":
+        now = run_cmd(["date"])
+        return {"log": "clock · fetched", "entityId": f"time_{uid()}", "response": f"It is {now}"}
+
+    if intent == "CALCULATE":
+        # Safe eval for demo purposes
+        expr = p.get("expression", "")
+        # Replace common words with operators
+        expr = expr.lower().replace("plus", "+").replace("minus", "-").replace("times", "*").replace("divided by", "/").replace("over", "/")
+        # Very basic sanitization
+        clean_expr = re.sub(r'[^\d+\-*/().]', '', expr)
+        try:
+            # pylint: disable=eval-used
+            res = eval(clean_expr, {"__builtins__": None}, {})
+            return {"log": "calc · computed", "entityId": f"calc_{uid()}", "response": f"The answer is {res}"}
+        except:
+             return {"log": "calc · error", "entityId": f"err_{uid()}", "response": "I couldn't calculate that"}
+
+    if intent == "TELL_JOKE":
+        jokes = [
+            "Why do programmers prefer dark mode? Because light attracts bugs.",
+            "I ordered a chicken and an egg from Amazon. I'll let you know.",
+            "What is a cloud's favourite number? Seven. Because seven ate nine, and it was overcast.",
+            "I told my wife she was drawing her eyebrows too high. She looked surprised."
+        ]
+        joke = random.choice(jokes)
+        return {"log": "joke · told", "entityId": f"joke_{uid()}", "response": joke}
+
+    if intent == "GET_QUOTE":
+        quotes = [
+            "The only way to do great work is to love what you do. — Steve Jobs",
+            "Code is like humor. When you have to explain it, it’s bad. — Cory House",
+            "Simplicity is the soul of efficiency. — Austin Freeman",
+            "Talk is cheap. Show me the code. — Linus Torvalds"
+        ]
+        quote = random.choice(quotes)
+        return {"log": "quote · fetched", "entityId": f"quote_{uid()}", "response": quote}
+
+    if intent == "FLIP_COIN":
+        res = random.choice(["Heads", "Tails"])
+        return {"log": "coin · flipped", "entityId": f"coin_{uid()}", "response": res}
+
+    if intent == "ROLL_DIE":
+        res = str(random.randint(1, 6))
+        return {"log": "die · rolled", "entityId": f"die_{uid()}", "response": res}
+
+    if intent == "DEFINE_WORD":
+        w = p.get("word", "unknown")
+        # Mock definition
+        return {"log": "dictionary · defined", "entityId": f"def_{uid()}", "response": f"Definition of {w}: A word used in this demo."}
+
+    if intent == "CONVERT_CURRENCY":
+        # Mock conversion
+        return {"log": "currency · converted", "entityId": f"curr_{uid()}", "response": "1 USD is approximately 0.94 EUR"}
+
+    if intent == "GET_IP":
+        # Try to get local IP
+        try:
+            # This works on macOS/Linux usually
+            ip = run_cmd(["ifconfig"])
+            # Extract first non-loopback IP for demo (very rough regex)
+            m = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', ip)
+            my_ip = m.group(1) if m else "127.0.0.1"
+            if my_ip == "127.0.0.1":
+                # Try another way
+                my_ip = subprocess.getoutput("hostname -I").split()[0]
+        except:
+            my_ip = "Unknown"
+        return {"log": "ip · fetched", "entityId": f"ip_{uid()}", "response": f"Your IP address is {my_ip}"}
+
+    if intent == "GET_UPTIME":
+        up = run_cmd(["uptime"])
+        # Format: 10:00  up 1 day, 20 mins, 2 users, load averages: ...
+        return {"log": "uptime · fetched", "entityId": f"uptime_{uid()}", "response": f"System status: {up.split(',')[0]}"}
 
     return {"log": "no-op", "entityId": "none", "response": "I couldn't handle that command"}
 

@@ -1697,6 +1697,14 @@
         data-network="ONLINE">⛓ Multi-chain<small>timer + music</small></button>
       <button class="preset-btn glow-surface" type="button" data-command="Search the web for restaurants"
         data-privacy="ON" data-network="ONLINE">🔍 Web search<small>privacy test</small></button>
+      <button class="preset-btn glow-surface" type="button" data-command="What time is it"
+        data-privacy="ON" data-network="ONLINE">🕒 Time<small>local · date</small></button>
+      <button class="preset-btn glow-surface" type="button" data-command="Tell me a joke"
+        data-privacy="ON" data-network="ONLINE">😂 Joke<small>local · fun</small></button>
+      <button class="preset-btn glow-surface" type="button" data-command="Calculate 10 times 5"
+        data-privacy="ON" data-network="ONLINE">🧮 Calculator<small>local · math</small></button>
+      <button class="preset-btn glow-surface" type="button" data-command="Flip a coin"
+        data-privacy="ON" data-network="ONLINE">🪙 Coin Flip<small>local · random</small></button>
     </div>
   </section>
 
@@ -1976,7 +1984,16 @@
           { id: "com.google.youtubemusic", scope: "REMOTE", needsNetwork: true, color: "var(--red)" },
           { id: "com.apple.maps.mcp", scope: "REMOTE", needsNetwork: true, color: "var(--yellow)" },
           { id: "com.apple.weather.mcp", scope: "REMOTE", needsNetwork: true, color: "var(--blue)" },
-          { id: "com.apple.websearch.mcp", scope: "REMOTE", needsNetwork: true, color: "var(--red)" }
+          { id: "com.apple.websearch.mcp", scope: "REMOTE", needsNetwork: true, color: "var(--red)" },
+          { id: "com.apple.clock.mcp", scope: "LOCAL", needsNetwork: false, color: "var(--green)" },
+          { id: "com.apple.calculator.mcp", scope: "LOCAL", needsNetwork: false, color: "var(--blue)" },
+          { id: "com.entertainment.jokes.mcp", scope: "LOCAL", needsNetwork: false, color: "var(--purple)" },
+          { id: "com.entertainment.quotes.mcp", scope: "LOCAL", needsNetwork: false, color: "var(--yellow)" },
+          { id: "com.tools.random.mcp", scope: "LOCAL", needsNetwork: false, color: "var(--green)" },
+          { id: "com.reference.dictionary.mcp", scope: "REMOTE", needsNetwork: true, color: "var(--blue)" },
+          { id: "com.finance.currency.mcp", scope: "REMOTE", needsNetwork: true, color: "var(--yellow)" },
+          { id: "com.network.ip.mcp", scope: "LOCAL", needsNetwork: false, color: "var(--purple)" },
+          { id: "com.system.uptime.mcp", scope: "LOCAL", needsNetwork: false, color: "var(--green)" }
         ];
 
         /* ── DOM ─── */
@@ -2196,7 +2213,10 @@
                 'timer': 'var(--green)', 'calendar': 'var(--blue)', 'messages': 'var(--purple)',
                 'notes': 'var(--green)', 'reminders': 'var(--blue)', 'volume': 'var(--purple)', 'finder': 'var(--yellow)',
                 'screenshot': 'var(--green)', 'clipboard': 'var(--blue)', 'systeminfo': 'var(--purple)',
-                'youtubemusic': 'var(--red)', 'maps': 'var(--yellow)', 'weather': 'var(--blue)', 'websearch': 'var(--red)'
+                'youtubemusic': 'var(--red)', 'maps': 'var(--yellow)', 'weather': 'var(--blue)', 'websearch': 'var(--red)',
+                'clock': 'var(--green)', 'calculator': 'var(--blue)', 'jokes': 'var(--purple)', 'quotes': 'var(--yellow)',
+                'random': 'var(--green)', 'dictionary': 'var(--blue)', 'currency': 'var(--yellow)', 'ip': 'var(--purple)',
+                'uptime': 'var(--green)'
               };
               msg.servers.forEach(s => {
                 const key = s.id.split('.').slice(-1)[0].replace('.mcp', '');
@@ -2503,6 +2523,40 @@
           if (/open\s+(\w+)/.test(t)) {
             return { supported: true, intent: 'OPEN_APP', confidence: 0.88, routeType: 'local', servers: ['com.apple.finder.mcp'], privacyClass: 'local_safe' };
           }
+
+          // Date & Time
+          if (/time|date|day is it/.test(t) && !/calculate|math|times/.test(t)) // Avoid conflict with calculator
+            return { supported: true, intent: 'GET_DATE_TIME', confidence: 0.96, routeType: 'local', servers: ['com.apple.clock.mcp'], privacyClass: 'local_safe' };
+          // Calculator
+          if (/calculate|math|plus|minus|times|divided/.test(t))
+            return { supported: true, intent: 'CALCULATE', confidence: 0.95, routeType: 'local', servers: ['com.apple.calculator.mcp'], privacyClass: 'local_safe', params: { expression: t } };
+          // Joke
+          if (/joke|laugh/.test(t))
+            return { supported: true, intent: 'TELL_JOKE', confidence: 0.92, routeType: 'local', servers: ['com.entertainment.jokes.mcp'], privacyClass: 'local_safe' };
+          // Quote
+          if (/quote|inspire|wisdom|motivation/.test(t))
+            return { supported: true, intent: 'GET_QUOTE', confidence: 0.91, routeType: 'local', servers: ['com.entertainment.quotes.mcp'], privacyClass: 'local_safe' };
+          // Coin Flip
+          if (/flip.*coin|heads.*tails/.test(t))
+            return { supported: true, intent: 'FLIP_COIN', confidence: 0.94, routeType: 'local', servers: ['com.tools.random.mcp'], privacyClass: 'local_safe' };
+          // Dice Roll
+          if (/roll.*(die|dice)/.test(t))
+            return { supported: true, intent: 'ROLL_DIE', confidence: 0.94, routeType: 'local', servers: ['com.tools.random.mcp'], privacyClass: 'local_safe' };
+          // Dictionary
+          if (/define|meaning of|definition/.test(t)) {
+             const word = t.replace(/(define|meaning of|definition of|what is the)\s*/, '').trim();
+             return { supported: true, intent: 'DEFINE_WORD', confidence: 0.92, routeType: 'remote', servers: ['com.reference.dictionary.mcp'], privacyClass: 'external_search', params: { word } };
+          }
+          // Currency
+          if (/convert.*(currency|usd|eur|gbp|yen)|price of/.test(t))
+            return { supported: true, intent: 'CONVERT_CURRENCY', confidence: 0.90, routeType: 'remote', servers: ['com.finance.currency.mcp'], privacyClass: 'external_search', params: { query: t } };
+          // Local IP
+          if (/my ip|ip address/.test(t))
+            return { supported: true, intent: 'GET_IP', confidence: 0.95, routeType: 'local', servers: ['com.network.ip.mcp'], privacyClass: 'local_safe' };
+          // Uptime
+          if (/uptime|how long.*running/.test(t))
+            return { supported: true, intent: 'GET_UPTIME', confidence: 0.93, routeType: 'local', servers: ['com.system.uptime.mcp'], privacyClass: 'local_safe' };
+
           return { supported: false, intent: 'UNSUPPORTED', confidence: 0.58, routeType: 'none', servers: [], privacyClass: 'unknown' };
         }
         function privacyCheck(plan, env) {
@@ -2538,6 +2592,16 @@
             case 'OPEN_APP': return { log: 'app · launched', entityId: 'app_' + uid(), response: 'Opening app' };
             case 'REPEAT_LAST': return { log: 'replay · last command', entityId: 'replay_' + uid(), response: 'Repeating last command' };
             case 'RECALL_HISTORY': return { log: 'history · recalled', entityId: 'hist_' + uid(), response: 'Showing recent history' };
+            case 'GET_DATE_TIME': return { log: 'clock · fetched', entityId: 'time_' + uid(), response: 'It is ' + new Date().toLocaleString() };
+            case 'CALCULATE': return { log: 'calc · computed', entityId: 'calc_' + uid(), response: 'The answer is 42 (simulated)' };
+            case 'TELL_JOKE': return { log: 'joke · told', entityId: 'joke_' + uid(), response: 'Why did the chicken cross the road? To get to the other side.' };
+            case 'GET_QUOTE': return { log: 'quote · fetched', entityId: 'quote_' + uid(), response: 'The only way to do great work is to love what you do.' };
+            case 'FLIP_COIN': return { log: 'coin · flipped', entityId: 'coin_' + uid(), response: Math.random() > 0.5 ? 'Heads' : 'Tails' };
+            case 'ROLL_DIE': return { log: 'die · rolled', entityId: 'die_' + uid(), response: '' + Math.floor(Math.random() * 6 + 1) };
+            case 'DEFINE_WORD': return { log: 'dictionary · defined', entityId: 'def_' + uid(), response: 'Definition of ' + (plan.params.word || 'word') + ': A word used in this demo.' };
+            case 'CONVERT_CURRENCY': return { log: 'currency · converted', entityId: 'curr_' + uid(), response: '1 USD is approximately 0.94 EUR' };
+            case 'GET_IP': return { log: 'ip · fetched', entityId: 'ip_' + uid(), response: 'Your IP address is 127.0.0.1 (simulated)' };
+            case 'GET_UPTIME': return { log: 'uptime · fetched', entityId: 'uptime_' + uid(), response: 'System status: up 1 day, 2:30' };
             default: return { log: 'no-op', entityId: session.lastEntity, response: 'I could not complete that command' };
           }
         }
@@ -2629,7 +2693,10 @@
           CREATE_NOTE: 'var(--green)', CREATE_REMINDER: 'var(--blue)', OPEN_FINDER: 'var(--yellow)',
           OPEN_MAPS: 'var(--red)', SEND_MESSAGE: 'var(--purple)', CREATE_EVENT: 'var(--blue)',
           OPEN_APP: 'var(--green)', REPEAT_LAST: 'var(--yellow)', RECALL_HISTORY: 'var(--blue)',
-          UNSUPPORTED: 'var(--red)'
+          GET_DATE_TIME: 'var(--green)', CALCULATE: 'var(--blue)', TELL_JOKE: 'var(--purple)',
+          GET_QUOTE: 'var(--yellow)', FLIP_COIN: 'var(--green)', ROLL_DIE: 'var(--green)',
+          DEFINE_WORD: 'var(--blue)', CONVERT_CURRENCY: 'var(--yellow)', GET_IP: 'var(--purple)',
+          GET_UPTIME: 'var(--green)', UNSUPPORTED: 'var(--red)'
         };
 
         function recordRun(cmd, intent, confidence, routeType, latencyMs, succeeded) {
