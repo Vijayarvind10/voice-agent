@@ -72,10 +72,21 @@ def run_open(url: str) -> str:
     except Exception as e:
         return str(e)
 
+# ── TTS State ─────────────────────────────────────────────────────────
+tts_process = None
+
+def kill_tts():
+    global tts_process
+    if tts_process and tts_process.poll() is None:
+        tts_process.kill()
+        tts_process = None
+
 def speak(text: str):
     """TTS via macOS say command (non-blocking)."""
+    global tts_process
+    kill_tts() # Stop any ongoing speech before starting a new one
     clean = re.sub(r'[^\w\s.,!?\'-]', '', text)[:200]
-    subprocess.Popen(["say", "-v", "Samantha", clean])
+    tts_process = subprocess.Popen(["say", "-v", "Samantha", clean])
 
 
 # ── Intent Classification ─────────────────────────────────────────────
@@ -441,8 +452,13 @@ async def websocket_endpoint(ws: WebSocket):
             network = data.get("network", "ONLINE")
             tts = data.get("tts", True)
 
-            if not cmd:
+            if not cmd and data.get("type") != "barge_in":
                 await ws.send_json({"type": "error", "message": "Empty command"})
+                continue
+
+            # Handle Barge-In
+            if data.get("type") == "barge_in":
+                kill_tts()
                 continue
 
             # Multi-command chaining
