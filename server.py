@@ -108,13 +108,6 @@ def escape_osascript(s: str) -> str:
     """Escape user input for safe embedding in AppleScript strings."""
     return s.replace('\\', '\\\\').replace('"', '\\"').replace("'", "\\'")
 
-def run_osascript(script: str) -> str:
-    try:
-        r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=10)
-        return r.stdout.strip() or r.stderr.strip() or "ok"
-    except Exception as e:
-        return str(e)
-
 async def run_cmd(args: list, timeout=5) -> str:
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -135,6 +128,13 @@ async def run_cmd(args: list, timeout=5) -> str:
         out = stdout.decode().strip()
         err = stderr.decode().strip()
         return out or err or "ok"
+    except Exception as e:
+        return str(e)
+
+async def run_osascript(script: str) -> str:
+    try:
+        # Optimized: Async execution avoids blocking the event loop
+        return await run_cmd(["osascript", "-e", script], timeout=10)
     except Exception as e:
         return str(e)
 
@@ -431,7 +431,7 @@ async def execute(plan: dict) -> dict:
     if intent == "SET_TIMER":
         secs = p.get("seconds", 600)
         dur = p.get("duration", "10 minutes")
-        run_osascript(f'display notification "Timer set for {dur}" with title "Voice MCP" sound name "Tink"')
+        await run_osascript(f'display notification "Timer set for {dur}" with title "Voice MCP" sound name "Tink"')
         subprocess.Popen(["bash", "-c",
             f'sleep {secs} && osascript -e \'display notification "⏱ Timer done!" with title "Voice MCP" sound name "Glass"\''])
         return {"log": f"timer · armed for {dur}", "entityId": f"timer_{uid()}",
@@ -483,21 +483,21 @@ async def execute(plan: dict) -> dict:
 
     if intent == "VOLUME_CONTROL":
         if p.get("mute"):
-            run_osascript('set volume with output muted')
+            await run_osascript('set volume with output muted')
             return {"log": "volume · muted", "entityId": f"vol_{uid()}", "response": "Volume muted"}
         if p.get("unmute"):
-            run_osascript('set volume without output muted')
+            await run_osascript('set volume without output muted')
             return {"log": "volume · unmuted", "entityId": f"vol_{uid()}", "response": "Volume unmuted"}
         level = p.get("level")
         if level is not None:
             apple_vol = max(0, min(100, level)) / 100 * 7
-            run_osascript(f'set volume output volume {level}')
+            await run_osascript(f'set volume output volume {level}')
             return {"log": f"volume · set to {level}%", "entityId": f"vol_{uid()}", "response": f"Volume set to {level}%"}
         return {"log": "volume · no action", "entityId": f"vol_{uid()}", "response": "Say 'set volume to 50' or 'mute'"}
 
     if intent == "CREATE_NOTE":
         body = escape_osascript(p.get("body", "Note from Voice MCP"))
-        run_osascript(f'''
+        await run_osascript(f'''
             tell application "Notes"
                 activate
                 tell account "iCloud"
@@ -510,7 +510,7 @@ async def execute(plan: dict) -> dict:
 
     if intent == "CREATE_REMINDER":
         body = escape_osascript(p.get("body", "Reminder"))
-        run_osascript(f'''
+        await run_osascript(f'''
             tell application "Reminders"
                 activate
                 tell list "Reminders"
@@ -553,7 +553,7 @@ async def execute(plan: dict) -> dict:
 
     if intent == "CREATE_EVENT":
         run_open("/System/Applications/Calendar.app")
-        run_osascript('tell application "Calendar" to activate')
+        await run_osascript('tell application "Calendar" to activate')
         return {"log": "calendar · opened", "entityId": f"event_{uid()}", "response": "Opening Calendar"}
 
     if intent == "OPEN_APP":
