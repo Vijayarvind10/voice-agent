@@ -2685,6 +2685,7 @@
         /* ── Audio visualizer ─── */
         const visCtx = dom.micVis.getContext('2d');
         let visRAF = null;
+        let audioData = null; // ⚡ Bolt: Cache audio data array to prevent GC pauses during animation
         function startAudioVis() {
           // Bug 8 fix: track pending promise to prevent AudioContext leaks
           const micPromiseId = {};
@@ -2699,14 +2700,14 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioCtx.createAnalyser();
             analyser.fftSize = 64;
+            audioData = new Uint8Array(analyser.frequencyBinCount); // ⚡ Bolt: Allocate once
             audioCtx.createMediaStreamSource(stream).connect(analyser);
             drawVis();
           }).catch(() => { });
         }
         function drawVis() {
-          if (!analyser) return;
-          const data = new Uint8Array(analyser.frequencyBinCount);
-          analyser.getByteFrequencyData(data);
+          if (!analyser || !audioData) return;
+          analyser.getByteFrequencyData(audioData); // ⚡ Bolt: Reuse array to avoid ~60 allocations/sec
           const w = dom.micVis.width, h = dom.micVis.height, cx = w / 2, cy = h / 2;
           visCtx.clearRect(0, 0, w, h);
           const time = Date.now() * 0.003;
@@ -2715,8 +2716,8 @@
             const count = 30;
             for (let i = 0; i <= count; i++) {
               const angle = (i / count) * Math.PI * 2;
-              const dIdx = Math.floor((i / count) * data.length * 0.5);
-              const val = (data[dIdx] || 0) / 255;
+              const dIdx = Math.floor((i / count) * audioData.length * 0.5);
+              const val = (audioData[dIdx] || 0) / 255;
               const r = 18 + val * 14 + Math.sin(angle * 3 + time + j) * 3;
               const x = cx + Math.cos(angle) * r;
               const y = cy + Math.sin(angle) * r;
@@ -2735,7 +2736,7 @@
           visCtx.clearRect(0, 0, w, h);
           if (micStream) micStream.getTracks().forEach(t => t.stop());
           if (audioCtx) audioCtx.close().catch(() => { });
-          audioCtx = null; analyser = null; micStream = null;
+          audioCtx = null; analyser = null; micStream = null; audioData = null; // ⚡ Bolt: Free memory
         }
 
         /* ── Intent badge ─── */
