@@ -1,0 +1,3 @@
+## 2024-05-18 - [Preventing memory allocation inside requestAnimationFrame]
+**Learning:** Instantiating `new Uint8Array()` inside a high-frequency loop like `requestAnimationFrame` creates significant garbage collection pressure, leading to visual stuttering and poor performance. In this codebase's audio visualizer (`drawVis`), allocating a 32-element array 60 times a second caused unnecessary overhead.
+**Action:** Always pre-allocate arrays and objects outside of animation loops, and reuse them inside the loop. In `index.html`, we moved the `Uint8Array` allocation to the visualizer setup (`startAudioVis`) and only modified its contents via `getByteFrequencyData` inside the loop.
