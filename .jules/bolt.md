@@ -1,0 +1,4 @@
+## 2024-05-14 - Prevent GC Micro-stutters in RequestAnimationFrame
+
+**Learning:** Allocating `new Uint8Array` inside a `requestAnimationFrame` loop (like the `drawVis` function in `index.html`) creates significant garbage collection pressure, as a new array is created 60 times a second. In low-level Web Audio rendering loops, this GC pressure directly contributes to visual micro-stutters.
+**Action:** Always hoist object and array allocations out of `requestAnimationFrame` loops. Declare them globally or in the closest shared scope, initialize them once, reuse the instance to pass data within the rendering loop, and then set them to `null` to safely free memory when the process terminates.
