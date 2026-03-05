@@ -2685,6 +2685,7 @@
         /* ── Audio visualizer ─── */
         const visCtx = dom.micVis.getContext('2d');
         let visRAF = null;
+        let visData = null;
         function startAudioVis() {
           // Bug 8 fix: track pending promise to prevent AudioContext leaks
           const micPromiseId = {};
@@ -2705,8 +2706,11 @@
         }
         function drawVis() {
           if (!analyser) return;
-          const data = new Uint8Array(analyser.frequencyBinCount);
-          analyser.getByteFrequencyData(data);
+          if (!visData || visData.length !== analyser.frequencyBinCount) {
+            visData = new Uint8Array(analyser.frequencyBinCount); // ⚡ Bolt: Reuse array to prevent GC micro-stutters
+          }
+          analyser.getByteFrequencyData(visData);
+          const data = visData;
           const w = dom.micVis.width, h = dom.micVis.height, cx = w / 2, cy = h / 2;
           visCtx.clearRect(0, 0, w, h);
           const time = Date.now() * 0.003;
@@ -2735,7 +2739,7 @@
           visCtx.clearRect(0, 0, w, h);
           if (micStream) micStream.getTracks().forEach(t => t.stop());
           if (audioCtx) audioCtx.close().catch(() => { });
-          audioCtx = null; analyser = null; micStream = null;
+          audioCtx = null; analyser = null; micStream = null; visData = null;
         }
 
         /* ── Intent badge ─── */
