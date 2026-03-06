@@ -1,0 +1,3 @@
+## 2024-05-24 - [Avoid `new Uint8Array` allocations on every animation frame]
+**Learning:** [The `drawVis` function was running in a `requestAnimationFrame` loop and creating a `new Uint8Array(analyser.frequencyBinCount)` on every frame. This introduces unnecessary garbage collection pressure and could lead to rendering micro-stutters during voice interactions.]
+**Action:** [I declared a cached array variable `let visData = null;` at the outer scope, then inside `drawVis`, I lazily instantiate and reuse it via `if (!visData || visData.length !== analyser.frequencyBinCount) visData = new Uint8Array(analyser.frequencyBinCount);`. This is an important codebase-specific pattern to apply for anything within a hot path or RAF loop.]
