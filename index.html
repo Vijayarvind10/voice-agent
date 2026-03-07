@@ -2685,6 +2685,7 @@
         /* ── Audio visualizer ─── */
         const visCtx = dom.micVis.getContext('2d');
         let visRAF = null;
+        let visDataArray = null; // ⚡ Bolt: Cache Uint8Array to prevent GC pressure during requestAnimationFrame
         function startAudioVis() {
           // Bug 8 fix: track pending promise to prevent AudioContext leaks
           const micPromiseId = {};
@@ -2705,7 +2706,11 @@
         }
         function drawVis() {
           if (!analyser) return;
-          const data = new Uint8Array(analyser.frequencyBinCount);
+          // ⚡ Bolt: Re-use array to prevent GC micro-stutters
+          if (!visDataArray || visDataArray.length !== analyser.frequencyBinCount) {
+            visDataArray = new Uint8Array(analyser.frequencyBinCount);
+          }
+          const data = visDataArray;
           analyser.getByteFrequencyData(data);
           const w = dom.micVis.width, h = dom.micVis.height, cx = w / 2, cy = h / 2;
           visCtx.clearRect(0, 0, w, h);
