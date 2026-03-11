@@ -3,7 +3,13 @@ Real Time Voice MCP — Backend Server
 FastAPI + WebSocket with 13 MCP servers, TTS, multi-command chaining, conversational memory.
 """
 
-import asyncio, json, subprocess, re, random, string, urllib.parse, os, platform
+import asyncio
+import subprocess
+import re
+import random
+import string
+import urllib.parse
+import os
 from datetime import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -391,9 +397,12 @@ def classify(text: str, session_state: dict = None) -> dict:
 def privacy_check(plan, privacy_mode):
     if plan["privacyClass"] == "external_search" and privacy_mode == "ON":
         return {"approved": False, "label": "BLOCKED · privacy mode ON"}
-    if plan["routeType"] == "local":  return {"approved": True, "label": "LOCAL · approved"}
-    if plan["routeType"] == "pcc":    return {"approved": True, "label": "PCC · approved"}
-    if plan["routeType"] == "remote": return {"approved": True, "label": "REMOTE · approved"}
+    if plan["routeType"] == "local":
+        return {"approved": True, "label": "LOCAL · approved"}
+    if plan["routeType"] == "pcc":
+        return {"approved": True, "label": "PCC · approved"}
+    if plan["routeType"] == "remote":
+        return {"approved": True, "label": "REMOTE · approved"}
     return {"approved": False, "label": "BLOCKED · unsupported"}
 
 def route_check(plan, network_mode):
@@ -449,7 +458,7 @@ async def execute(plan: dict) -> dict:
         try:
             r = subprocess.run(["curl", "-s", f"https://wttr.in/{loc_param}?format=3"], capture_output=True, text=True, timeout=5)
             weather = r.stdout.strip() or "Weather data unavailable"
-        except:
+        except Exception:
             weather = "Could not fetch weather"
         return {"log": f"weather · {loc or 'local'}", "entityId": f"weather_{uid()}",
                 "response": weather}
@@ -459,7 +468,7 @@ async def execute(plan: dict) -> dict:
         path = os.path.expanduser(f"~/Desktop/screenshot_{ts}.png")
         await run_cmd(["screencapture", "-x", path])
         return {"log": f"screenshot · {path}", "entityId": f"ss_{uid()}",
-                "response": f"Screenshot saved to Desktop"}
+                "response": "Screenshot saved to Desktop"}
 
     if intent == "CLIPBOARD":
         content = await run_cmd(["pbpaste"])
@@ -472,8 +481,10 @@ async def execute(plan: dict) -> dict:
         bat_match = re.search(r'(\d+)%', battery)
         bat_pct = bat_match.group(1) + "%" if bat_match else "N/A"
         mem = await run_cmd(["sysctl", "-n", "hw.memsize"])
-        try: mem_gb = f"{int(mem) / (1024**3):.0f}GB"
-        except: mem_gb = "N/A"
+        try:
+            mem_gb = f"{int(mem) / (1024**3):.0f}GB"
+        except Exception:
+            mem_gb = "N/A"
         cpu = await run_cmd(["sysctl", "-n", "machdep.cpu.brand_string"])
         disk = await run_cmd(["df", "-h", "/"])
         disk_match = re.search(r'(\d+)%', disk)
@@ -490,7 +501,6 @@ async def execute(plan: dict) -> dict:
             return {"log": "volume · unmuted", "entityId": f"vol_{uid()}", "response": "Volume unmuted"}
         level = p.get("level")
         if level is not None:
-            apple_vol = max(0, min(100, level)) / 100 * 7
             run_osascript(f'set volume output volume {level}')
             return {"log": f"volume · set to {level}%", "entityId": f"vol_{uid()}", "response": f"Volume set to {level}%"}
         return {"log": "volume · no action", "entityId": f"vol_{uid()}", "response": "Say 'set volume to 50' or 'mute'"}
@@ -505,7 +515,7 @@ async def execute(plan: dict) -> dict:
                 end tell
             end tell
         ''')
-        return {"log": f"notes · created", "entityId": f"note_{uid()}",
+        return {"log": "notes · created", "entityId": f"note_{uid()}",
                 "response": f"Note created: {body[:60]}"}
 
     if intent == "CREATE_REMINDER":
@@ -518,7 +528,7 @@ async def execute(plan: dict) -> dict:
                 end tell
             end tell
         ''')
-        return {"log": f"reminders · added", "entityId": f"rem_{uid()}",
+        return {"log": "reminders · added", "entityId": f"rem_{uid()}",
                 "response": f"Reminder added: {body[:60]}"}
 
     if intent == "OPEN_FINDER":
@@ -576,7 +586,7 @@ async def execute(plan: dict) -> dict:
             # pylint: disable=eval-used
             res = eval(clean_expr, {"__builtins__": None}, {})
             return {"log": "calc · computed", "entityId": f"calc_{uid()}", "response": f"The answer is {res}"}
-        except:
+        except Exception:
              return {"log": "calc · error", "entityId": f"err_{uid()}", "response": "I couldn't calculate that"}
 
     if intent == "TELL_JOKE":
@@ -627,7 +637,7 @@ async def execute(plan: dict) -> dict:
             if my_ip == "127.0.0.1":
                 # Try another way
                 my_ip = subprocess.getoutput("hostname -I").split()[0]
-        except:
+        except Exception:
             my_ip = "Unknown"
         return {"log": "ip · fetched", "entityId": f"ip_{uid()}", "response": f"Your IP address is {my_ip}"}
 
@@ -806,9 +816,9 @@ app.mount("/static", StaticFiles(directory="."), name="static")
 if __name__ == "__main__":
     print("\n  🎙  Real Time Voice MCP — Backend Server")
     print("  ─────────────────────────────────────────")
-    print(f"  → http://localhost:8000")
-    print(f"  → WebSocket: ws://localhost:8000/ws")
+    print("  → http://localhost:8000")
+    print("  → WebSocket: ws://localhost:8000/ws")
     print(f"  → {len(SERVERS)} MCP servers registered")
-    print(f"  → TTS enabled (macOS Samantha voice)")
+    print("  → TTS enabled (macOS Samantha voice)")
     print("  → Press Ctrl+C to stop\n")
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

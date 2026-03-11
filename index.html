@@ -3181,9 +3181,14 @@
           dom.stageCount.textContent = '0 / 8 stages';
         }
         let logDelay = 0;
+        let logEmptyRemoved = false; // ⚡ Bolt: Cache empty state removal status
         function addLog(tag, text, status, mark) {
-          // Remove empty state
-          const empty = dom.logs.querySelector('.empty-state'); if (empty) empty.remove();
+          // ⚡ Bolt: Prevent redundant DOM lookup for '.empty-state' on every log
+          if (!logEmptyRemoved) {
+            const empty = dom.logs.querySelector('.empty-state');
+            if (empty) empty.remove();
+            logEmptyRemoved = true;
+          }
           const line = document.createElement('div');
           line.className = 'log-line';
           line.style.animationDelay = logDelay + 'ms';
@@ -3199,7 +3204,7 @@
           dom.logs.appendChild(line);
           dom.logs.scrollTop = dom.logs.scrollHeight;
         }
-        function clearLogs() { dom.logs.innerHTML = ''; logDelay = 0; }
+        function clearLogs() { dom.logs.innerHTML = ''; logDelay = 0; logEmptyRemoved = false; }
 
         function renderServers() {
           const online = getNetwork() === 'ONLINE';
