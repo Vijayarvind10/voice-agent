@@ -432,8 +432,18 @@ async def execute(plan: dict) -> dict:
         secs = p.get("seconds", 600)
         dur = p.get("duration", "10 minutes")
         run_osascript(f'display notification "Timer set for {dur}" with title "Voice MCP" sound name "Tink"')
-        subprocess.Popen(["bash", "-c",
-            f'sleep {secs} && osascript -e \'display notification "⏱ Timer done!" with title "Voice MCP" sound name "Glass"\''])
+
+        async def timer_task(s):
+            await asyncio.sleep(s)
+            try:
+                cmd = ['osascript', '-e', 'display notification "⏱ Timer done!" with title "Voice MCP" sound name "Glass"']
+                # Use async subprocess to avoid blocking the loop
+                proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                await proc.wait()
+            except Exception as e:
+                print(f"Timer notification failed: {e}")
+
+        asyncio.create_task(timer_task(secs))
         return {"log": f"timer · armed for {dur}", "entityId": f"timer_{uid()}",
                 "response": f"Timer set for {dur}"}
 
