@@ -3,7 +3,7 @@ Real Time Voice MCP — Backend Server
 FastAPI + WebSocket with 13 MCP servers, TTS, multi-command chaining, conversational memory.
 """
 
-import asyncio, json, subprocess, re, random, string, urllib.parse, os, platform
+import asyncio, json, subprocess, re, random, string, urllib.parse, os, platform, secrets
 from datetime import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -95,7 +95,7 @@ MAX_HISTORY = 20
 
 # ── Helpers ───────────────────────────────────────────────────────────
 def uid():
-    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
+    return ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(6))
 
 def wake_score(cmd: str) -> float:
     return min(0.98, 0.91 + (len(cmd) % 5) * 0.01)
