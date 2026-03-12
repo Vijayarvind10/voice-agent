@@ -101,8 +101,8 @@ def wake_score(cmd: str) -> float:
     return min(0.98, 0.91 + (len(cmd) % 5) * 0.01)
 
 def normalise(s: str) -> str:
-    c = re.sub(r'\s+', ' ', s.strip())
-    return c[0].lower() + c[1:] if c else ""
+    """Normalize whitespace and preserve original casing (matches JS implementation)."""
+    return re.sub(r'\s+', ' ', s.strip())
 
 def escape_osascript(s: str) -> str:
     """Escape user input for safe embedding in AppleScript strings."""
