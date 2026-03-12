@@ -3,7 +3,13 @@ Real Time Voice MCP — Backend Server
 FastAPI + WebSocket with 13 MCP servers, TTS, multi-command chaining, conversational memory.
 """
 
-import asyncio, json, subprocess, re, random, string, urllib.parse, os, platform
+import asyncio
+import subprocess
+import re
+import random
+import string
+import urllib.parse
+import os
 from datetime import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -163,13 +169,24 @@ def speak(text: str):
 
 
 # ── Intent Classification ─────────────────────────────────────────────
-def classify(text: str, session_state: dict = None) -> dict:
-    t = text.lower()
-    state = session_state or {}
 
-    # Handle awaiting slot for timer duration
+def make_simple_handler(regex, intent, servers, confidence=0.90, route_type="local", privacy="local_safe"):
+    def handler(t, state):
+        if regex.search(t):
+            return {
+                "supported": True,
+                "intent": intent,
+                "confidence": confidence,
+                "routeType": route_type,
+                "servers": servers,
+                "privacyClass": privacy,
+                "params": {}
+            }
+        return None
+    return handler
+
+def handle_timer_slot(t, state):
     if state.get("awaiting_slot") == "timer_duration":
-        # Check if the user is answering with a duration
         m = RE_TIMER_DURATION.search(t)
         if m:
             dur = f"{m.group(1)} {m.group(2)}s"
@@ -179,7 +196,6 @@ def classify(text: str, session_state: dict = None) -> dict:
             return {"supported": True, "intent": "SET_TIMER", "confidence": 0.98,
                     "routeType": "local", "servers": ["com.apple.timer.mcp"],
                     "privacyClass": "local_safe", "params": {"duration": dur, "seconds": secs}}
-        # If they didn't provide a duration, but it's just a number:
         m2 = RE_TIMER_NUMERIC.search(t)
         if m2:
             dur = f"{m2.group(1)} minutes"
@@ -187,21 +203,9 @@ def classify(text: str, session_state: dict = None) -> dict:
             return {"supported": True, "intent": "SET_TIMER", "confidence": 0.96,
                     "routeType": "local", "servers": ["com.apple.timer.mcp"],
                     "privacyClass": "local_safe", "params": {"duration": dur, "seconds": secs}}
-        # If they entirely changed the subject, fall through to normal classification
-        pass
+    return None
 
-    # Memory / context
-    if RE_REPEAT.search(t):
-        return {"supported": True, "intent": "REPEAT_LAST", "confidence": 0.95,
-                "routeType": "local", "servers": ["com.apple.clipboard.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    if RE_HISTORY.search(t):
-        return {"supported": True, "intent": "RECALL_HISTORY", "confidence": 0.93,
-                "routeType": "local", "servers": ["com.apple.clipboard.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # Timer
+def handle_timer(t, state):
     if RE_TIMER_KEYWORD.search(t):
         m = RE_TIMER_DURATION.search(t)
         if m:
@@ -213,45 +217,29 @@ def classify(text: str, session_state: dict = None) -> dict:
                     "routeType": "local", "servers": ["com.apple.timer.mcp"],
                     "privacyClass": "local_safe", "params": {"duration": dur, "seconds": secs}}
         else:
-            # Missing duration
             return {"supported": True, "intent": "MISSING_SLOT", "confidence": 0.90,
                     "routeType": "local", "servers": [], "privacyClass": "local_safe",
                     "params": {"slot": "timer_duration", "message": "For how long?"}}
+    return None
 
-    # Music
+def handle_music(t, state):
     if RE_MUSIC_KEYWORD.search(t):
         query = RE_MUSIC_QUERY.sub('', t).strip()
         return {"supported": True, "intent": "PLAY_MUSIC", "confidence": 0.93,
                 "routeType": "remote", "servers": ["com.google.youtubemusic"],
                 "privacyClass": "remote_media", "params": {"query": query or "jazz"}}
+    return None
 
-    # Weather
+def handle_weather(t, state):
     if RE_WEATHER_KEYWORD.search(t):
         m2 = RE_WEATHER_LOC.search(t)
         loc = m2.group(1).strip() if m2 else ""
         return {"supported": True, "intent": "GET_WEATHER", "confidence": 0.94,
                 "routeType": "remote", "servers": ["com.apple.weather.mcp"],
                 "privacyClass": "remote_data", "params": {"location": loc}}
+    return None
 
-    # Screenshot
-    if RE_SCREENSHOT.search(t):
-        return {"supported": True, "intent": "TAKE_SCREENSHOT", "confidence": 0.95,
-                "routeType": "local", "servers": ["com.apple.screenshot.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # Clipboard
-    if RE_CLIPBOARD.search(t):
-        return {"supported": True, "intent": "CLIPBOARD", "confidence": 0.92,
-                "routeType": "local", "servers": ["com.apple.clipboard.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # System info
-    if RE_SYSINFO.search(t):
-        return {"supported": True, "intent": "SYSTEM_INFO", "confidence": 0.94,
-                "routeType": "local", "servers": ["com.apple.systeminfo.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # Volume
+def handle_volume(t, state):
     if RE_VOLUME_KEYWORD.search(t):
         m3 = RE_VOLUME_LEVEL.search(t)
         level = int(m3.group(1)) if m3 else None
@@ -260,128 +248,176 @@ def classify(text: str, session_state: dict = None) -> dict:
         return {"supported": True, "intent": "VOLUME_CONTROL", "confidence": 0.93,
                 "routeType": "local", "servers": ["com.apple.volume.mcp"],
                 "privacyClass": "local_safe", "params": {"level": level, "mute": mute, "unmute": unmute}}
+    return None
 
-    # Notes
+def handle_notes(t, state):
     if RE_NOTE_KEYWORD.search(t):
         body = RE_NOTE_BODY.sub('', t).strip()
         return {"supported": True, "intent": "CREATE_NOTE", "confidence": 0.91,
                 "routeType": "local", "servers": ["com.apple.notes.mcp"],
                 "privacyClass": "local_safe", "params": {"body": body or "New note from Voice MCP"}}
+    return None
 
-    # Reminders
+def handle_reminders(t, state):
     if RE_REMINDER_KEYWORD.search(t):
         body = RE_REMINDER_BODY.sub('', t).strip()
         return {"supported": True, "intent": "CREATE_REMINDER", "confidence": 0.92,
                 "routeType": "local", "servers": ["com.apple.reminders.mcp"],
                 "privacyClass": "local_safe", "params": {"body": body or "Voice MCP reminder"}}
+    return None
 
-    # Finder
+def handle_finder(t, state):
     if RE_FINDER_KEYWORD.search(t):
         m4 = RE_FINDER_FOLDER.search(t)
         folder = m4.group(1) if m4 else "Finder"
         return {"supported": True, "intent": "OPEN_FINDER", "confidence": 0.93,
                 "routeType": "local", "servers": ["com.apple.finder.mcp"],
                 "privacyClass": "local_safe", "params": {"folder": folder}}
+    return None
 
-    # Messages + Calendar (cross-context)
+def handle_followup(t, state):
     if RE_MESSAGE_KEYWORD.search(t) and RE_FOLLOWUP_KEYWORD.search(t):
         return {"supported": True, "intent": "FOLLOWUP_FROM_MESSAGE", "confidence": 0.91,
                 "routeType": "pcc", "servers": ["com.apple.messages.mcp", "com.apple.calendar.mcp"],
                 "privacyClass": "cross_context_local", "params": {}}
+    return None
 
-    # Web search
+def handle_web_search(t, state):
     if RE_SEARCH_KEYWORD.search(t):
         query = RE_SEARCH_QUERY.sub('', t).strip()
         return {"supported": True, "intent": "WEB_SEARCH", "confidence": 0.90,
                 "routeType": "remote", "servers": ["com.apple.websearch.mcp"],
                 "privacyClass": "external_search", "params": {"query": query or "search"}}
+    return None
 
-    # Maps
+def handle_maps(t, state):
     if RE_MAPS_KEYWORD.search(t):
         query = RE_MAPS_QUERY.sub('', t).strip()
         return {"supported": True, "intent": "OPEN_MAPS", "confidence": 0.92,
                 "routeType": "remote", "servers": ["com.apple.maps.mcp"],
                 "privacyClass": "remote_data", "params": {"query": query or "current location"}}
+    return None
 
-    # Send message
-    if RE_SEND_MSG.search(t):
-        return {"supported": True, "intent": "SEND_MESSAGE", "confidence": 0.89,
-                "routeType": "local", "servers": ["com.apple.messages.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # Calendar event
-    if RE_CREATE_EVENT.search(t):
-        return {"supported": True, "intent": "CREATE_EVENT", "confidence": 0.90,
-                "routeType": "local", "servers": ["com.apple.calendar.mcp"],
-                "privacyClass": "local_safe", "params": {}}
-
-    # Generic open app
+def handle_open_app(t, state):
     if RE_OPEN_APP.search(t):
         app_name = RE_OPEN_APP.search(t).group(1)
         return {"supported": True, "intent": "OPEN_APP", "confidence": 0.88,
                 "routeType": "local", "servers": ["com.apple.finder.mcp"],
                 "privacyClass": "local_safe", "params": {"app": app_name}}
+    return None
 
-    # Date & Time
+def handle_date_time(t, state):
     if re.search(r'\btime\b|date|day is it', t):
         return {"supported": True, "intent": "GET_DATE_TIME", "confidence": 0.96,
                 "routeType": "local", "servers": ["com.apple.clock.mcp"],
                 "privacyClass": "local_safe", "params": {}}
+    return None
 
-    # Calculator
+def handle_calculate(t, state):
     if re.search(r'calculate|math|plus|minus|times|divided', t):
         return {"supported": True, "intent": "CALCULATE", "confidence": 0.95,
                 "routeType": "local", "servers": ["com.apple.calculator.mcp"],
                 "privacyClass": "local_safe", "params": {"expression": t}}
+    return None
 
-    # Joke
+def handle_joke(t, state):
     if re.search(r'joke|laugh', t):
         return {"supported": True, "intent": "TELL_JOKE", "confidence": 0.92,
                 "routeType": "local", "servers": ["com.entertainment.jokes.mcp"],
                 "privacyClass": "local_safe", "params": {}}
+    return None
 
-    # Quote
+def handle_quote(t, state):
     if re.search(r'quote|inspire|wisdom|motivation', t):
         return {"supported": True, "intent": "GET_QUOTE", "confidence": 0.91,
                 "routeType": "local", "servers": ["com.entertainment.quotes.mcp"],
                 "privacyClass": "local_safe", "params": {}}
+    return None
 
-    # Coin Flip
+def handle_coin_flip(t, state):
     if re.search(r'flip.*coin|heads.*tails', t):
         return {"supported": True, "intent": "FLIP_COIN", "confidence": 0.94,
                 "routeType": "local", "servers": ["com.tools.random.mcp"],
                 "privacyClass": "local_safe", "params": {}}
+    return None
 
-    # Dice Roll
+def handle_die_roll(t, state):
     if re.search(r'roll.*(die|dice)', t):
         return {"supported": True, "intent": "ROLL_DIE", "confidence": 0.94,
                 "routeType": "local", "servers": ["com.tools.random.mcp"],
                 "privacyClass": "local_safe", "params": {}}
+    return None
 
-    # Dictionary
+def handle_definition(t, state):
     if re.search(r'define|meaning of|definition', t):
         word = re.sub(r'(define|meaning of|definition of|what is the)\s*', '', t).strip()
         return {"supported": True, "intent": "DEFINE_WORD", "confidence": 0.92,
                 "routeType": "remote", "servers": ["com.reference.dictionary.mcp"],
                 "privacyClass": "external_search", "params": {"word": word}}
+    return None
 
-    # Currency
+def handle_currency(t, state):
     if re.search(r'convert.*(currency|usd|eur|gbp|yen)|price of', t):
         return {"supported": True, "intent": "CONVERT_CURRENCY", "confidence": 0.90,
                 "routeType": "remote", "servers": ["com.finance.currency.mcp"],
                 "privacyClass": "external_search", "params": {"query": t}}
+    return None
 
-    # Local IP
+def handle_ip(t, state):
     if re.search(r'my ip|ip address', t):
         return {"supported": True, "intent": "GET_IP", "confidence": 0.95,
                 "routeType": "local", "servers": ["com.network.ip.mcp"],
                 "privacyClass": "local_safe", "params": {}}
+    return None
 
-    # Uptime
+def handle_uptime(t, state):
     if re.search(r'uptime|how long.*running', t):
         return {"supported": True, "intent": "GET_UPTIME", "confidence": 0.93,
                 "routeType": "local", "servers": ["com.system.uptime.mcp"],
                 "privacyClass": "local_safe", "params": {}}
+    return None
+
+
+INTENT_HANDLERS = [
+    handle_timer_slot,
+    make_simple_handler(RE_REPEAT, "REPEAT_LAST", ["com.apple.clipboard.mcp"], 0.95),
+    make_simple_handler(RE_HISTORY, "RECALL_HISTORY", ["com.apple.clipboard.mcp"], 0.93),
+    handle_timer,
+    handle_music,
+    handle_weather,
+    make_simple_handler(RE_SCREENSHOT, "TAKE_SCREENSHOT", ["com.apple.screenshot.mcp"], 0.95),
+    make_simple_handler(RE_CLIPBOARD, "CLIPBOARD", ["com.apple.clipboard.mcp"], 0.92),
+    make_simple_handler(RE_SYSINFO, "SYSTEM_INFO", ["com.apple.systeminfo.mcp"], 0.94),
+    handle_volume,
+    handle_notes,
+    handle_reminders,
+    handle_finder,
+    handle_followup,
+    handle_web_search,
+    handle_maps,
+    make_simple_handler(RE_SEND_MSG, "SEND_MESSAGE", ["com.apple.messages.mcp"], 0.89),
+    make_simple_handler(RE_CREATE_EVENT, "CREATE_EVENT", ["com.apple.calendar.mcp"], 0.90),
+    handle_open_app,
+    handle_date_time,
+    handle_calculate,
+    handle_joke,
+    handle_quote,
+    handle_coin_flip,
+    handle_die_roll,
+    handle_definition,
+    handle_currency,
+    handle_ip,
+    handle_uptime,
+]
+
+def classify(text: str, session_state: dict = None) -> dict:
+    t = text.lower()
+    state = session_state or {}
+
+    for handler in INTENT_HANDLERS:
+        result = handler(t, state)
+        if result:
+            return result
 
     return {"supported": False, "intent": "UNSUPPORTED", "confidence": 0.58,
             "routeType": "none", "servers": [], "privacyClass": "unknown", "params": {}}
@@ -459,7 +495,7 @@ async def execute(plan: dict) -> dict:
         path = os.path.expanduser(f"~/Desktop/screenshot_{ts}.png")
         await run_cmd(["screencapture", "-x", path])
         return {"log": f"screenshot · {path}", "entityId": f"ss_{uid()}",
-                "response": f"Screenshot saved to Desktop"}
+                "response": "Screenshot saved to Desktop"}
 
     if intent == "CLIPBOARD":
         content = await run_cmd(["pbpaste"])
@@ -505,7 +541,7 @@ async def execute(plan: dict) -> dict:
                 end tell
             end tell
         ''')
-        return {"log": f"notes · created", "entityId": f"note_{uid()}",
+        return {"log": "notes · created", "entityId": f"note_{uid()}",
                 "response": f"Note created: {body[:60]}"}
 
     if intent == "CREATE_REMINDER":
@@ -518,7 +554,7 @@ async def execute(plan: dict) -> dict:
                 end tell
             end tell
         ''')
-        return {"log": f"reminders · added", "entityId": f"rem_{uid()}",
+        return {"log": "reminders · added", "entityId": f"rem_{uid()}",
                 "response": f"Reminder added: {body[:60]}"}
 
     if intent == "OPEN_FINDER":
@@ -806,9 +842,9 @@ app.mount("/static", StaticFiles(directory="."), name="static")
 if __name__ == "__main__":
     print("\n  🎙  Real Time Voice MCP — Backend Server")
     print("  ─────────────────────────────────────────")
-    print(f"  → http://localhost:8000")
-    print(f"  → WebSocket: ws://localhost:8000/ws")
+    print("  → http://localhost:8000")
+    print("  → WebSocket: ws://localhost:8000/ws")
     print(f"  → {len(SERVERS)} MCP servers registered")
-    print(f"  → TTS enabled (macOS Samantha voice)")
+    print("  → TTS enabled (macOS Samantha voice)")
     print("  → Press Ctrl+C to stop\n")
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
