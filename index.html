@@ -2148,6 +2148,13 @@
         <div class="mic-label" id="micLabel">Tap to speak</div>
       </div>
 
+      <div class="controls-row" style="margin-bottom: 12px;">
+        <div class="input-wrap">
+          <label class="sr-only" for="apiKeyInput">API Key</label>
+          <input id="apiKeyInput" type="password" placeholder="Enter API Key" />
+        </div>
+      </div>
+
       <div class="controls-row">
         <div class="input-wrap">
           <label class="sr-only" for="commandInput">Command</label>
@@ -2547,6 +2554,7 @@
         /* ── DOM ─── */
         const $ = s => document.querySelector(s);
         const dom = {
+          apiKey: $('#apiKeyInput'),
           input: $('#commandInput'), speak: $('#speakBtn'), logs: $('#logPanel'),
           presets: $('#presetGrid'), serverList: $('#serverList'),
           sId: $('#session-id'), sActive: $('#session-active'), sTurns: $('#session-turns'),
@@ -2750,11 +2758,36 @@
 
         /* ── WebSocket connection ─── */
         let ws = null, wsConnected = false;
+
+        // Load API Key from localStorage
+        if (localStorage.getItem('mcp_api_key')) {
+          dom.apiKey.value = localStorage.getItem('mcp_api_key');
+        }
+        let apiKeyTimeout;
+        dom.apiKey.addEventListener('input', () => {
+          localStorage.setItem('mcp_api_key', dom.apiKey.value);
+          clearTimeout(apiKeyTimeout);
+          apiKeyTimeout = setTimeout(() => {
+            if (!wsConnected) connectWS();
+          }, 500);
+        });
+
         function connectWS() {
           try {
-            ws = new WebSocket('ws://localhost:8000/ws');
+            if (ws && (ws.readyState === 0 || ws.readyState === 1)) return; // Already connecting or connected
+            const token = dom.apiKey.value.trim();
+            const url = 'ws://localhost:8000/ws' + (token ? '?token=' + encodeURIComponent(token) : '');
+            ws = new WebSocket(url);
             ws.onopen = () => { wsConnected = true; dom.micLabel.textContent = '● Server connected — tap to speak'; };
-            ws.onclose = () => { wsConnected = false; dom.micLabel.textContent = 'Tap to speak (offline mode)'; setTimeout(connectWS, 3000); };
+            ws.onclose = (e) => {
+              wsConnected = false;
+              if (e.code === 1008) {
+                dom.micLabel.textContent = 'Auth failed — Check API Key';
+              } else {
+                dom.micLabel.textContent = 'Tap to speak (offline mode)';
+              }
+              setTimeout(connectWS, 3000);
+            };
             ws.onerror = () => { wsConnected = false; };
             ws.onmessage = (e) => { handleWSMessage(JSON.parse(e.data)); };
           } catch (_) { wsConnected = false; setTimeout(connectWS, 3000); }
