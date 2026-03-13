@@ -2495,6 +2495,12 @@
         /* ── Star field ─── */
         const sCtx = canvas.getContext('2d');
         let stars = [];
+        let isStarCanvasVisible = false;
+        let starCanvasObserver = new IntersectionObserver((entries) => {
+          isStarCanvasVisible = entries[0].isIntersecting;
+        });
+        if (canvas) starCanvasObserver.observe(canvas);
+
         function initStars() {
           canvas.width = window.innerWidth; canvas.height = window.innerHeight;
           stars = Array.from({ length: 120 }, () => ({
@@ -2503,6 +2509,10 @@
           }));
         }
         function drawStars() {
+          if (!isStarCanvasVisible) {
+            requestAnimationFrame(drawStars);
+            return;
+          }
           sCtx.clearRect(0, 0, canvas.width, canvas.height);
           stars.forEach(s => {
             s.a += s.s; if (s.a > 1) s.s = -Math.abs(s.s); if (s.a < 0.1) s.s = Math.abs(s.s);
