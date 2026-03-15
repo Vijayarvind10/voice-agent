@@ -1,104 +1,50 @@
-import asyncio
-from playwright.async_api import async_playwright
-import http.server
-import socketserver
-import threading
+import os
 import time
+from playwright.sync_api import sync_playwright, expect
 
-PORT = 8080
+def test_speech_interaction():
+    with sync_playwright() as p:
+        # Launch Chromium with fake media stream to bypass permission prompts
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--use-fake-ui-for-media-stream",
+                "--use-fake-device-for-media-stream"
+            ]
+        )
+        context = browser.new_context()
+        page = context.new_page()
 
-def run_server():
-    Handler = http.server.SimpleHTTPRequestHandler
-    with socketserver.TCPServer(("", PORT), Handler) as httpd:
-        print("serving at port", PORT)
-        httpd.serve_forever()
+        # Block external CDN assets to avoid navigation timeouts
+        page.route("**/*.{png,jpg,jpeg,woff,woff2,ttf,svg,css}", lambda route: route.abort())
+        page.route("**/lenis.min.js", lambda route: route.abort())
+        page.route("**/gsap.min.js", lambda route: route.abort())
+        page.route("**/ScrollTrigger.min.js", lambda route: route.abort())
 
-async def main():
-    # Start server in a thread
-    server_thread = threading.Thread(target=run_server, daemon=True)
-    server_thread.start()
-    time.sleep(1) # Wait for server to start
+        # Navigate to the local index.html file
+        filepath = os.path.abspath('index.html')
+        page.goto(f"file://{filepath}")
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(permissions=['microphone'])
-        page = await context.new_page()
+        # Wait for the page to load
+        page.wait_for_selector("#commandInput")
 
-        # Inject mock for SpeechRecognition
-        await page.add_init_script("""
-            window.mockSpeechRecognition = class {
-                constructor() {
-                    this.continuous = false;
-                    this.interimResults = false;
-                    this.lang = 'en-US';
-                    this.onresult = null;
-                    this.onend = null;
-                    this.onerror = null;
-                    this.onstart = null;
-                    this._started = false;
-                }
-                start() {
-                    console.log('Mock SpeechRecognition started');
-                    this._started = true;
-                    if (this.onstart) this.onstart();
+        # Test inputting a command that triggers classify()
+        input_box = page.locator("#commandInput")
+        input_box.fill("Set a timer for 5 minutes")
 
-                    // Simulate no result if we want to reproduce the bug
-                    // Or simulate result to verify it works
+        # Click the "Run" button to trigger the pipeline
+        run_btn = page.locator("#speakBtn")
+        run_btn.click()
 
-                    // Let's simulate a delay then a result
-                    setTimeout(() => {
-                        if (!this._started) return;
-                        if (this.onresult) {
-                            const event = {
-                                resultIndex: 0,
-                                results: {
-                                    length: 1,
-                                    item: (index) => this.results[index],
-                                    0: {
-                                        isFinal: true,
-                                        0: { transcript: 'test command' }
-                                    }
-                                }
-                            };
-                            // Add array accessors which are present in real API
-                            event.results[0][0] = { transcript: 'test command' };
-                            this.onresult(event);
-                        }
-                        this.stop();
-                    }, 1000);
-                }
-                stop() {
-                    console.log('Mock SpeechRecognition stopped');
-                    this._started = false;
-                    if (this.onend) this.onend();
-                }
-            };
-            window.SpeechRecognition = window.mockSpeechRecognition;
-            window.webkitSpeechRecognition = window.mockSpeechRecognition;
-        """)
+        # Wait for the logs to update to confirm classification worked
+        # The first stage is INVOCATION, then ASR, then ATTENTION
+        page.wait_for_selector(".log-line .stage-tag", timeout=5000)
 
-        await page.goto(f'http://localhost:{PORT}/index.html')
+        # Take a screenshot of the result
+        os.makedirs("/home/jules/verification", exist_ok=True)
+        page.screenshot(path="/home/jules/verification/classification_test.png")
 
-        # Check initial state
-        print("Initial input value:", await page.input_value('#commandInput'))
-
-        # Click mic button
-        print("Clicking mic button...")
-        await page.click('#micBtn')
-
-        # Wait a bit for simulation
-        await asyncio.sleep(2)
-
-        # Check if input was updated
-        input_value = await page.input_value('#commandInput')
-        print("Input value after speech:", input_value)
-
-        if input_value == 'test command':
-            print("SUCCESS: Input updated correctly.")
-        else:
-            print("FAILURE: Input not updated.")
-
-        await browser.close()
+        browser.close()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    test_speech_interaction()
