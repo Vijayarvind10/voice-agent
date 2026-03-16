@@ -1,0 +1,3 @@
+## 2026-03-16 - [Invisible Canvas Animation Loop CPU Burn]
+**Learning:** `requestAnimationFrame` loops on `display: none` canvas elements (like the `#starCanvas` in this app) still execute at full frame rate in active tabs, causing unnecessary CPU burn. Browsers only throttle `requestAnimationFrame` when the *entire tab* is hidden, not when the specific DOM element is `display: none` or out of the viewport.
+**Action:** Use an `IntersectionObserver` to track the visibility of the canvas and pause the `requestAnimationFrame` loop when the element is hidden or not intersecting to save CPU cycles.

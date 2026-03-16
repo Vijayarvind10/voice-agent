@@ -2495,6 +2495,9 @@
         /* ── Star field ─── */
         const sCtx = canvas.getContext('2d');
         let stars = [];
+        let starRAF = null;
+        let starIsVisible = false;
+
         function initStars() {
           canvas.width = window.innerWidth; canvas.height = window.innerHeight;
           stars = Array.from({ length: 120 }, () => ({
@@ -2509,9 +2512,41 @@
             sCtx.beginPath(); sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
             sCtx.fillStyle = `rgba(255,255,255,${s.a * 0.4})`; sCtx.fill();
           });
-          requestAnimationFrame(drawStars);
+          if (starIsVisible) starRAF = requestAnimationFrame(drawStars);
         }
-        initStars(); drawStars();
+        initStars();
+
+        // ⚡ Bolt: Pause canvas animation when not visible to reduce CPU usage
+        const starObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              if (!starIsVisible) {
+                starIsVisible = true;
+                drawStars();
+              }
+            } else {
+              starIsVisible = false;
+              if (starRAF) cancelAnimationFrame(starRAF);
+              starRAF = null;
+            }
+          });
+        });
+        starObserver.observe(canvas);
+
+        // Use a MutationObserver to detect style changes since the canvas toggles 'display: none'
+        const starMutationObserver = new MutationObserver(() => {
+          const isHidden = window.getComputedStyle(canvas).display === 'none';
+          if (isHidden && starIsVisible) {
+             starIsVisible = false;
+             if (starRAF) cancelAnimationFrame(starRAF);
+             starRAF = null;
+          } else if (!isHidden && !starIsVisible) {
+             starIsVisible = true;
+             drawStars();
+          }
+        });
+        starMutationObserver.observe(canvas, { attributes: true, attributeFilter: ['class', 'style'] });
+
         window.addEventListener('resize', initStars);
 
         /* ── Constants ─── */
