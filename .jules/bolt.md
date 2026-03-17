@@ -1,0 +1,3 @@
+## 2026-03-17 - IntersectionObserver for hidden canvas animations
+**Learning:** Background animations (`requestAnimationFrame`) continue to run and consume CPU even when elements are hidden via `display: none` or are completely off-screen, unless the browser specifically throttles the entire tab. In this architecture, `#starCanvas` was continuously running `drawStars` in the background even when hidden behind the `#bootOverlay`.
+**Action:** Always wrap continuous `requestAnimationFrame` loops tied to specific UI elements with an `IntersectionObserver`. Only execute the drawing logic and request the next frame when `isIntersecting` is true, pausing it when the element is hidden or scrolled out of view.
