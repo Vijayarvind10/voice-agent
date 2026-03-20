@@ -1,0 +1,3 @@
+## 2024-05-24 - [Hidden GC pressure in requestAnimationFrame loop]
+**Learning:** Re-instantiating typed arrays like `Uint8Array` directly inside a `requestAnimationFrame` loop (e.g., in `drawVis`) introduces significant hidden garbage collection (GC) pressure. At ~60 FPS, this causes frequent allocations that can lead to micro-stutters, particularly in apps handling live media streams.
+**Action:** When implementing rendering or visualizer loops in this codebase, always hoist high-frequency data structures outside the `requestAnimationFrame` function. Initialize them once (e.g., when the visualizer starts) and clear them explicitly on teardown.
