@@ -2502,7 +2502,18 @@
             r: Math.random() * 1.2 + 0.3, a: Math.random(), s: Math.random() * 0.003 + 0.001
           }));
         }
+        // Pause canvas animation when not visible to save CPU
+        let isStarCanvasVisible = false;
+        const starObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            isStarCanvasVisible = entry.isIntersecting;
+            if (isStarCanvasVisible) drawStars();
+          });
+        });
+        starObserver.observe(canvas);
+
         function drawStars() {
+          if (!isStarCanvasVisible) return;
           sCtx.clearRect(0, 0, canvas.width, canvas.height);
           stars.forEach(s => {
             s.a += s.s; if (s.a > 1) s.s = -Math.abs(s.s); if (s.a < 0.1) s.s = Math.abs(s.s);
@@ -2511,7 +2522,7 @@
           });
           requestAnimationFrame(drawStars);
         }
-        initStars(); drawStars();
+        initStars();
         window.addEventListener('resize', initStars);
 
         /* ── Constants ─── */
