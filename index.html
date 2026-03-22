@@ -2685,6 +2685,7 @@
         /* ── Audio visualizer ─── */
         const visCtx = dom.micVis.getContext('2d');
         let visRAF = null;
+        let visData = null; // ⚡ Bolt: Persistent buffer to avoid allocation per frame
         function startAudioVis() {
           // Bug 8 fix: track pending promise to prevent AudioContext leaks
           const micPromiseId = {};
@@ -2699,14 +2700,16 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioCtx.createAnalyser();
             analyser.fftSize = 64;
+            visData = new Uint8Array(analyser.frequencyBinCount); // ⚡ Bolt: Init once
             audioCtx.createMediaStreamSource(stream).connect(analyser);
             drawVis();
           }).catch(() => { });
         }
         function drawVis() {
-          if (!analyser) return;
-          const data = new Uint8Array(analyser.frequencyBinCount);
-          analyser.getByteFrequencyData(data);
+          if (!analyser || !visData) return;
+          // ⚡ Bolt: Re-use pre-allocated buffer instead of new Uint8Array per frame
+          analyser.getByteFrequencyData(visData);
+          const data = visData;
           const w = dom.micVis.width, h = dom.micVis.height, cx = w / 2, cy = h / 2;
           visCtx.clearRect(0, 0, w, h);
           const time = Date.now() * 0.003;
