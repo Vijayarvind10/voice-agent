@@ -1,0 +1,3 @@
+## 2023-10-27 - [requestAnimationFrame is not throttled for display: none elements]
+**Learning:** Browsers do not throttle `requestAnimationFrame` for elements hidden via `display: none` or off-screen if the tab is active, which can cause background CPU burn for animations like canvas drawing.
+**Action:** Always use an `IntersectionObserver` or `MutationObserver` to explicitly pause/cancel `requestAnimationFrame` loops for elements when they become hidden or are off-screen.

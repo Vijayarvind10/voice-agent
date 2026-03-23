@@ -2502,7 +2502,10 @@
             r: Math.random() * 1.2 + 0.3, a: Math.random(), s: Math.random() * 0.003 + 0.001
           }));
         }
+        // ⚡ Bolt: added flag to prevent requestAnimationFrame when hidden
+        let isDrawingStars = false;
         function drawStars() {
+          if (!isDrawingStars) return;
           sCtx.clearRect(0, 0, canvas.width, canvas.height);
           stars.forEach(s => {
             s.a += s.s; if (s.a > 1) s.s = -Math.abs(s.s); if (s.a < 0.1) s.s = Math.abs(s.s);
@@ -2511,7 +2514,23 @@
           });
           requestAnimationFrame(drawStars);
         }
-        initStars(); drawStars();
+        initStars();
+
+        // ⚡ Bolt: used IntersectionObserver to pause the animation when display: none
+        const starObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              if (!isDrawingStars) {
+                isDrawingStars = true;
+                drawStars();
+              }
+            } else {
+              isDrawingStars = false;
+            }
+          });
+        });
+        starObserver.observe(canvas);
+
         window.addEventListener('resize', initStars);
 
         /* ── Constants ─── */
