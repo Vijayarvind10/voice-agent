@@ -1,0 +1,3 @@
+## 2024-05-24 - [Audio Visualizer GC Anti-pattern]
+**Learning:** Re-allocating `Uint8Array` inside a `requestAnimationFrame` loop (like in the `drawVis` function for the audio visualizer) creates significant unnecessary garbage collection pressure. This can lead to jank and frame drops during critical UI animations, especially on lower-end devices processing audio streams.
+**Action:** When working with Web Audio API `analyser.getByteFrequencyData()`, always cache the `Uint8Array` buffer outside the loop and reuse it, only re-allocating if `fftSize` changes. Clear the reference when stopping the visualizer to free memory.
