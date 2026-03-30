@@ -2502,16 +2502,39 @@
             r: Math.random() * 1.2 + 0.3, a: Math.random(), s: Math.random() * 0.003 + 0.001
           }));
         }
+        let starRAF = null;
+        let starIsVisible = false;
         function drawStars() {
+          if (!starIsVisible) return;
           sCtx.clearRect(0, 0, canvas.width, canvas.height);
           stars.forEach(s => {
             s.a += s.s; if (s.a > 1) s.s = -Math.abs(s.s); if (s.a < 0.1) s.s = Math.abs(s.s);
             sCtx.beginPath(); sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
             sCtx.fillStyle = `rgba(255,255,255,${s.a * 0.4})`; sCtx.fill();
           });
-          requestAnimationFrame(drawStars);
+          if (starRAF) cancelAnimationFrame(starRAF);
+          starRAF = requestAnimationFrame(drawStars);
         }
-        initStars(); drawStars();
+        initStars();
+
+        // ⚡ Bolt: Used IntersectionObserver to pause the drawStars loop when the canvas is not visible to prevent CPU burn from un-throttled animations
+        const starObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              starIsVisible = true;
+              if (starRAF) cancelAnimationFrame(starRAF);
+              starRAF = requestAnimationFrame(drawStars);
+            } else {
+              starIsVisible = false;
+              if (starRAF) {
+                cancelAnimationFrame(starRAF);
+                starRAF = null;
+              }
+            }
+          });
+        });
+        starObserver.observe(canvas);
+
         window.addEventListener('resize', initStars);
 
         /* ── Constants ─── */
