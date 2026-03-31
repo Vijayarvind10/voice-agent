@@ -2495,6 +2495,8 @@
         /* ── Star field ─── */
         const sCtx = canvas.getContext('2d');
         let stars = [];
+        let starRAF = null;
+        let starsVisible = false;
         function initStars() {
           canvas.width = window.innerWidth; canvas.height = window.innerHeight;
           stars = Array.from({ length: 120 }, () => ({
@@ -2503,15 +2505,33 @@
           }));
         }
         function drawStars() {
+          if (!starsVisible) return;
           sCtx.clearRect(0, 0, canvas.width, canvas.height);
           stars.forEach(s => {
             s.a += s.s; if (s.a > 1) s.s = -Math.abs(s.s); if (s.a < 0.1) s.s = Math.abs(s.s);
             sCtx.beginPath(); sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
             sCtx.fillStyle = `rgba(255,255,255,${s.a * 0.4})`; sCtx.fill();
           });
-          requestAnimationFrame(drawStars);
+          if (starRAF) cancelAnimationFrame(starRAF);
+          starRAF = requestAnimationFrame(drawStars);
         }
-        initStars(); drawStars();
+        initStars();
+
+        // ⚡ Bolt: Use IntersectionObserver to pause the requestAnimationFrame loop when hidden
+        // Browsers do not throttle requestAnimationFrame for elements hidden via display:none.
+        const starObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            starsVisible = entry.isIntersecting;
+            if (starsVisible) {
+              drawStars();
+            } else if (starRAF) {
+              cancelAnimationFrame(starRAF);
+              starRAF = null;
+            }
+          });
+        });
+        if (canvas) starObserver.observe(canvas);
+
         window.addEventListener('resize', initStars);
 
         /* ── Constants ─── */
