@@ -1,0 +1,3 @@
+## 2024-05-24 - IntersectionObserver for requestAnimationFrame
+**Learning:** Browsers do not throttle `requestAnimationFrame` for elements hidden via `display: none` or off-screen if the tab is active. An animation loop running constantly for a hidden canvas consumes CPU unnecessarily, an anti-pattern found in this codebase for the `.starCanvas` element.
+**Action:** Use an `IntersectionObserver` or `MutationObserver` to explicitly pause/cancel `requestAnimationFrame` loops when the target element is no longer visible, and resume them only when visible.
