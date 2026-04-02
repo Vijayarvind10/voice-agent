@@ -2495,6 +2495,7 @@
         /* ── Star field ─── */
         const sCtx = canvas.getContext('2d');
         let stars = [];
+        let starRAF = null;
         function initStars() {
           canvas.width = window.innerWidth; canvas.height = window.innerHeight;
           stars = Array.from({ length: 120 }, () => ({
@@ -2509,9 +2510,25 @@
             sCtx.beginPath(); sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
             sCtx.fillStyle = `rgba(255,255,255,${s.a * 0.4})`; sCtx.fill();
           });
-          requestAnimationFrame(drawStars);
+          starRAF = requestAnimationFrame(drawStars);
         }
-        initStars(); drawStars();
+        initStars();
+
+        // ⚡ Bolt: Stop CPU burn from background canvas rendering when display:none
+        const starObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              if (!starRAF) drawStars();
+            } else {
+              if (starRAF) {
+                cancelAnimationFrame(starRAF);
+                starRAF = null;
+              }
+            }
+          });
+        });
+        starObserver.observe(canvas);
+
         window.addEventListener('resize', initStars);
 
         /* ── Constants ─── */

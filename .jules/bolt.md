@@ -1,0 +1,3 @@
+## 2026-04-02 - Hidden Animations Still Burn CPU
+**Learning:** Browsers do not throttle `requestAnimationFrame` for elements hidden via `display: none` or positioned off-screen if the browser tab itself remains active. In `index.html`, the `#starCanvas` was running continuously despite being visually hidden, causing unnecessary garbage collection pressure and CPU usage.
+**Action:** Always wrap `requestAnimationFrame` loops for off-screen/hidden elements with an `IntersectionObserver` or `MutationObserver`, explicitly calling `cancelAnimationFrame` when the element is not intersecting or is hidden.
