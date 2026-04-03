@@ -1,0 +1,3 @@
+## 2026-04-03 - Hoisting Regex Literals in Frontend Classify Function
+**Learning:** In JavaScript, defining regular expression literals (e.g., `/pattern/`) inside a frequently called function (like a debounce callback processing interim speech results) causes the engine to recreate those `RegExp` objects on every call. This leads to unnecessary garbage collection (GC) pressure and slight performance degradation.
+**Action:** Extract inline regular expressions into file-scope constant variables to ensure they are compiled and allocated only once. This is a critical pattern in this codebase for functions that run on high-frequency events or animation loops.
