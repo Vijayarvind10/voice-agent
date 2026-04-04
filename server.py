@@ -447,8 +447,8 @@ async def execute(plan: dict) -> dict:
         loc = p.get("location", "")
         loc_param = urllib.parse.quote_plus(loc) if loc else ""
         try:
-            r = subprocess.run(["curl", "-s", f"https://wttr.in/{loc_param}?format=3"], capture_output=True, text=True, timeout=5)
-            weather = r.stdout.strip() or "Weather data unavailable"
+            weather_out = await run_cmd(["curl", "-s", f"https://wttr.in/{loc_param}?format=3"], timeout=5)
+            weather = weather_out.strip() if weather_out and weather_out != "ok" else "Weather data unavailable"
         except:
             weather = "Could not fetch weather"
         return {"log": f"weather · {loc or 'local'}", "entityId": f"weather_{uid()}",
@@ -626,7 +626,8 @@ async def execute(plan: dict) -> dict:
             my_ip = m.group(1) if m else "127.0.0.1"
             if my_ip == "127.0.0.1":
                 # Try another way
-                my_ip = subprocess.getoutput("hostname -I").split()[0]
+                hostname_out = await run_cmd(["hostname", "-I"])
+                my_ip = hostname_out.split()[0] if hostname_out and hostname_out != "ok" else "Unknown"
         except:
             my_ip = "Unknown"
         return {"log": "ip · fetched", "entityId": f"ip_{uid()}", "response": f"Your IP address is {my_ip}"}
