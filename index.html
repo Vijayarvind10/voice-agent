@@ -2495,6 +2495,8 @@
         /* ── Star field ─── */
         const sCtx = canvas.getContext('2d');
         let stars = [];
+        let starRAF = null; // ⚡ Bolt: store RAF id to cancel
+        let starVisible = false; // ⚡ Bolt: track visibility to pause animation
         function initStars() {
           canvas.width = window.innerWidth; canvas.height = window.innerHeight;
           stars = Array.from({ length: 120 }, () => ({
@@ -2503,15 +2505,29 @@
           }));
         }
         function drawStars() {
+          if (!starVisible) return; // ⚡ Bolt: stop if hidden
           sCtx.clearRect(0, 0, canvas.width, canvas.height);
           stars.forEach(s => {
             s.a += s.s; if (s.a > 1) s.s = -Math.abs(s.s); if (s.a < 0.1) s.s = Math.abs(s.s);
             sCtx.beginPath(); sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
             sCtx.fillStyle = `rgba(255,255,255,${s.a * 0.4})`; sCtx.fill();
           });
-          requestAnimationFrame(drawStars);
+          starRAF = requestAnimationFrame(drawStars);
         }
-        initStars(); drawStars();
+        initStars();
+        // ⚡ Bolt: use IntersectionObserver to only draw when canvas is visible, avoiding CPU burn
+        const starObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            starVisible = entry.isIntersecting;
+            if (starVisible) {
+              if (starRAF) cancelAnimationFrame(starRAF);
+              drawStars();
+            } else {
+              if (starRAF) cancelAnimationFrame(starRAF);
+            }
+          });
+        });
+        if (canvas) starObserver.observe(canvas);
         window.addEventListener('resize', initStars);
 
         /* ── Constants ─── */
@@ -2685,6 +2701,7 @@
         /* ── Audio visualizer ─── */
         const visCtx = dom.micVis.getContext('2d');
         let visRAF = null;
+        let visData = null; // ⚡ Bolt: persistent array for freq data
         function startAudioVis() {
           // Bug 8 fix: track pending promise to prevent AudioContext leaks
           const micPromiseId = {};
@@ -2699,14 +2716,15 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioCtx.createAnalyser();
             analyser.fftSize = 64;
+            visData = new Uint8Array(analyser.frequencyBinCount); // ⚡ Bolt: alloc once
             audioCtx.createMediaStreamSource(stream).connect(analyser);
+            if (visRAF) cancelAnimationFrame(visRAF); // ⚡ Bolt: prevent multiple loops
             drawVis();
           }).catch(() => { });
         }
         function drawVis() {
-          if (!analyser) return;
-          const data = new Uint8Array(analyser.frequencyBinCount);
-          analyser.getByteFrequencyData(data);
+          if (!analyser || !visData) return;
+          analyser.getByteFrequencyData(visData); // ⚡ Bolt: reuse buffer, less GC
           const w = dom.micVis.width, h = dom.micVis.height, cx = w / 2, cy = h / 2;
           visCtx.clearRect(0, 0, w, h);
           const time = Date.now() * 0.003;
@@ -2715,8 +2733,8 @@
             const count = 30;
             for (let i = 0; i <= count; i++) {
               const angle = (i / count) * Math.PI * 2;
-              const dIdx = Math.floor((i / count) * data.length * 0.5);
-              const val = (data[dIdx] || 0) / 255;
+              const dIdx = Math.floor((i / count) * visData.length * 0.5);
+              const val = (visData[dIdx] || 0) / 255;
               const r = 18 + val * 14 + Math.sin(angle * 3 + time + j) * 3;
               const x = cx + Math.cos(angle) * r;
               const y = cy + Math.sin(angle) * r;
