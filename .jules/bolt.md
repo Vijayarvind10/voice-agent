@@ -1,0 +1,3 @@
+## 2026-04-14 - [Prevent CPU Burn from Hidden Animations]
+**Learning:** Browsers do not throttle `requestAnimationFrame` loops for elements hidden via `display: none` or off-screen, provided the tab is active. This can lead to significant CPU burn.
+**Action:** Use an `IntersectionObserver` to explicitly pause (via `cancelAnimationFrame`) the animation loop when the element is hidden or off-screen, and resume it when visible. Always clear the stored animation frame ID before requesting a new frame to prevent spawning multiple concurrent loops.
