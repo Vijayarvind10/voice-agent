@@ -1,0 +1,3 @@
+## 2026-04-20 - Animation Loop GC and CPU Profiling
+**Learning:** Instantiating `new Uint8Array()` directly inside `requestAnimationFrame` for the audio visualizer (`drawVis`) causes severe garbage collection pressure when running at 60fps. Also, browsers do not automatically throttle `requestAnimationFrame` for hidden `<canvas>` elements (`display: none`) if the tab is active, causing unnecessary CPU burn.
+**Action:** 1) Hoist array instantiations (like `Uint8Array`) out of animation loops, initializing them once per session and reusing the buffer. 2) Always wrap off-screen or hidden `<canvas>` loops in an `IntersectionObserver` to explicitly call `cancelAnimationFrame` when not visible.
