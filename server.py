@@ -626,8 +626,11 @@ async def execute(plan: dict) -> dict:
             my_ip = m.group(1) if m else "127.0.0.1"
             if my_ip == "127.0.0.1":
                 # Try another way
-                my_ip = subprocess.getoutput("hostname -I").split()[0]
-        except:
+                # ⚡ Bolt: Use async run_cmd instead of synchronous subprocess.getoutput to avoid blocking the event loop
+                hostname_out = await run_cmd(["hostname", "-I"])
+                if hostname_out and "." in hostname_out:
+                    my_ip = hostname_out.split()[0]
+        except Exception:
             my_ip = "Unknown"
         return {"log": "ip · fetched", "entityId": f"ip_{uid()}", "response": f"Your IP address is {my_ip}"}
 
