@@ -2685,6 +2685,7 @@
         /* ── Audio visualizer ─── */
         const visCtx = dom.micVis.getContext('2d');
         let visRAF = null;
+        let visDataArray = null; // ⚡ Bolt: Reuse array to prevent GC pressure in animation loop
         function startAudioVis() {
           // Bug 8 fix: track pending promise to prevent AudioContext leaks
           const micPromiseId = {};
@@ -2699,14 +2700,15 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioCtx.createAnalyser();
             analyser.fftSize = 64;
+            visDataArray = new Uint8Array(analyser.frequencyBinCount); // ⚡ Bolt: Init once
             audioCtx.createMediaStreamSource(stream).connect(analyser);
             drawVis();
           }).catch(() => { });
         }
         function drawVis() {
-          if (!analyser) return;
-          const data = new Uint8Array(analyser.frequencyBinCount);
-          analyser.getByteFrequencyData(data);
+          if (!analyser || !visDataArray) return;
+          analyser.getByteFrequencyData(visDataArray);
+          const data = visDataArray; // ⚡ Bolt: Reuse array
           const w = dom.micVis.width, h = dom.micVis.height, cx = w / 2, cy = h / 2;
           visCtx.clearRect(0, 0, w, h);
           const time = Date.now() * 0.003;
@@ -2735,7 +2737,7 @@
           visCtx.clearRect(0, 0, w, h);
           if (micStream) micStream.getTracks().forEach(t => t.stop());
           if (audioCtx) audioCtx.close().catch(() => { });
-          audioCtx = null; analyser = null; micStream = null;
+          audioCtx = null; analyser = null; micStream = null; visDataArray = null;
         }
 
         /* ── Intent badge ─── */
