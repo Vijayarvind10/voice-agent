@@ -1,0 +1,3 @@
+## 2026-04-28 - Unthrottled requestAnimationFrame on display: none
+**Learning:** Browsers do not throttle `requestAnimationFrame` for elements hidden via `display: none` or off-screen if the tab is active. In this codebase, the `#starCanvas` was unconditionally running its animation loop even when hidden, causing unnecessary CPU burn.
+**Action:** Use an `IntersectionObserver` to explicitly pause/resume `requestAnimationFrame` loops for hidden or off-screen elements (like `<canvas>`). Always use `cancelAnimationFrame` on the stored animation frame ID before requesting a new frame to prevent spawning multiple concurrent animation loops due to race conditions.
