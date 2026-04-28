@@ -2495,6 +2495,9 @@
         /* ── Star field ─── */
         const sCtx = canvas.getContext('2d');
         let stars = [];
+        let starsRAF = null;
+        let isCanvasVisible = false;
+
         function initStars() {
           canvas.width = window.innerWidth; canvas.height = window.innerHeight;
           stars = Array.from({ length: 120 }, () => ({
@@ -2502,16 +2505,35 @@
             r: Math.random() * 1.2 + 0.3, a: Math.random(), s: Math.random() * 0.003 + 0.001
           }));
         }
+
+        // ⚡ Bolt: Use IntersectionObserver to pause requestAnimationFrame when the canvas is hidden/off-screen to reduce CPU usage.
+        const canvasObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            isCanvasVisible = entry.isIntersecting;
+            if (isCanvasVisible) {
+              if (starsRAF) cancelAnimationFrame(starsRAF);
+              drawStars();
+            } else {
+              if (starsRAF) {
+                cancelAnimationFrame(starsRAF);
+                starsRAF = null;
+              }
+            }
+          });
+        });
+        if (canvas) canvasObserver.observe(canvas);
+
         function drawStars() {
+          if (!isCanvasVisible) return;
           sCtx.clearRect(0, 0, canvas.width, canvas.height);
           stars.forEach(s => {
             s.a += s.s; if (s.a > 1) s.s = -Math.abs(s.s); if (s.a < 0.1) s.s = Math.abs(s.s);
             sCtx.beginPath(); sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
             sCtx.fillStyle = `rgba(255,255,255,${s.a * 0.4})`; sCtx.fill();
           });
-          requestAnimationFrame(drawStars);
+          starsRAF = requestAnimationFrame(drawStars);
         }
-        initStars(); drawStars();
+        initStars();
         window.addEventListener('resize', initStars);
 
         /* ── Constants ─── */
@@ -2685,6 +2707,9 @@
         /* ── Audio visualizer ─── */
         const visCtx = dom.micVis.getContext('2d');
         let visRAF = null;
+        // ⚡ Bolt: Hoist the data array out of the draw loop to prevent garbage collection pressure
+        let visDataArray = null;
+
         function startAudioVis() {
           // Bug 8 fix: track pending promise to prevent AudioContext leaks
           const micPromiseId = {};
@@ -2699,14 +2724,16 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioCtx.createAnalyser();
             analyser.fftSize = 64;
+            // ⚡ Bolt: Initialize data array once
+            visDataArray = new Uint8Array(analyser.frequencyBinCount);
             audioCtx.createMediaStreamSource(stream).connect(analyser);
             drawVis();
           }).catch(() => { });
         }
         function drawVis() {
-          if (!analyser) return;
-          const data = new Uint8Array(analyser.frequencyBinCount);
-          analyser.getByteFrequencyData(data);
+          if (!analyser || !visDataArray) return;
+          // ⚡ Bolt: Re-use visDataArray instead of reallocating it
+          analyser.getByteFrequencyData(visDataArray);
           const w = dom.micVis.width, h = dom.micVis.height, cx = w / 2, cy = h / 2;
           visCtx.clearRect(0, 0, w, h);
           const time = Date.now() * 0.003;
@@ -2715,8 +2742,8 @@
             const count = 30;
             for (let i = 0; i <= count; i++) {
               const angle = (i / count) * Math.PI * 2;
-              const dIdx = Math.floor((i / count) * data.length * 0.5);
-              const val = (data[dIdx] || 0) / 255;
+              const dIdx = Math.floor((i / count) * visDataArray.length * 0.5);
+              const val = (visDataArray[dIdx] || 0) / 255;
               const r = 18 + val * 14 + Math.sin(angle * 3 + time + j) * 3;
               const x = cx + Math.cos(angle) * r;
               const y = cy + Math.sin(angle) * r;
@@ -2736,6 +2763,8 @@
           if (micStream) micStream.getTracks().forEach(t => t.stop());
           if (audioCtx) audioCtx.close().catch(() => { });
           audioCtx = null; analyser = null; micStream = null;
+          // ⚡ Bolt: Cleanup hoisted array
+          visDataArray = null;
         }
 
         /* ── Intent badge ─── */
