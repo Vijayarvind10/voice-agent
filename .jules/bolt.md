@@ -1,0 +1,3 @@
+## 2026-05-03 - Prevent event loop stalling with async subprocesses
+**Learning:** In a FastAPI websocket pipeline processing multiple simultaneous events (like "stage" messages for a chain of commands), executing synchronous tasks like `subprocess.run(["osascript"...])` or `subprocess.getoutput("hostname -I")` causes the entire async event loop to freeze. The application stops receiving network messages until the OS-level shell command completes, which can take multiple seconds for network requests.
+**Action:** Always use `asyncio.create_subprocess_exec` (via the existing `run_cmd` utility) to dispatch shell commands in asynchronous route handlers. This releases the event loop and dramatically reduces latency spikes from >1s to a few milliseconds.
