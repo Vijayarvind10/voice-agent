@@ -1,0 +1,3 @@
+## 2026-05-05 - Avoid Synchronous Subprocess Calls in Async FastAPI Handlers
+**Learning:** Using `subprocess.run` or `subprocess.getoutput` inside `async def` FastAPI endpoints (such as WebSocket pipeline handlers) will block the main async event loop. This leads to latency spikes, causing the server to stall when handling concurrent incoming I/O-bound requests (e.g. `osascript` or `curl`).
+**Action:** Always prefer using asynchronous alternatives like `await run_cmd` (which uses `asyncio.create_subprocess_exec`) or run synchronous blocks in an executor to avoid stalling the event loop and optimize request concurrency.
