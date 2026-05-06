@@ -2495,6 +2495,7 @@
         /* ── Star field ─── */
         const sCtx = canvas.getContext('2d');
         let stars = [];
+        let starRAF;
         function initStars() {
           canvas.width = window.innerWidth; canvas.height = window.innerHeight;
           stars = Array.from({ length: 120 }, () => ({
@@ -2509,9 +2510,24 @@
             sCtx.beginPath(); sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
             sCtx.fillStyle = `rgba(255,255,255,${s.a * 0.4})`; sCtx.fill();
           });
-          requestAnimationFrame(drawStars);
+          if (starRAF) cancelAnimationFrame(starRAF); // Prevent concurrent loops
+          starRAF = requestAnimationFrame(drawStars);
         }
-        initStars(); drawStars();
+        initStars();
+        // ⚡ Bolt: Use IntersectionObserver to stop animation loop when canvas is hidden, saving CPU
+        const starObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              drawStars();
+            } else {
+              if (starRAF) {
+                cancelAnimationFrame(starRAF);
+                starRAF = null;
+              }
+            }
+          });
+        }, { threshold: 0 });
+        if (canvas) starObserver.observe(canvas);
         window.addEventListener('resize', initStars);
 
         /* ── Constants ─── */
