@@ -1,0 +1,3 @@
+## 2026-05-06 - Unthrottled requestAnimationFrame in hidden Canvas Elements
+**Learning:** Browsers do not throttle `requestAnimationFrame` for elements that are simply hidden via `display: none` or positioned off-screen, as long as the tab itself is active. The application had a `#starCanvas` that ran endlessly in the background after the initial boot sequence despite being hidden, burning CPU cycles unnecessarily.
+**Action:** When using canvas animations that are temporarily hidden or out of view, always wrap the animation loop initiation with an `IntersectionObserver` (or manually trigger toggles) to `cancelAnimationFrame` when hidden, and resume it when intersecting/visible. Also, cancel existing RAF IDs before requesting a new one to avoid multiple concurrent loops.
