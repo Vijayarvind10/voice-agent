@@ -1,0 +1,3 @@
+## 2024-05-18 - Async Event Loop Blocking Anti-pattern
+**Learning:** Found multiple synchronous `subprocess.run` and `subprocess.getoutput` calls inside async request handlers in the FastAPI backend (`server.py`). These synchronous calls block the entire event loop, causing severe latency spikes (up to 10x slower response times) for concurrent tasks and stalling the WebSocket pipeline.
+**Action:** Always replace blocking subprocess calls with their asynchronous equivalents like `await asyncio.create_subprocess_exec` (via the existing `await run_cmd` helper) to prevent event loop stalls in high-concurrency environments like Playwright tests.
