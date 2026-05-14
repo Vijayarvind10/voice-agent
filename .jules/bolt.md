@@ -1,0 +1,3 @@
+## 2026-05-14 - Canvas Draw Allocation Bottleneck
+**Learning:** In high-frequency animation loops (like `requestAnimationFrame` running at 60fps), using string interpolation for colors (e.g., `sCtx.fillStyle = \`rgba(255,255,255,${s.a * 0.4})\`;`) inside an inner loop causes immense garbage collection pressure due to constant string allocation.
+**Action:** Use fixed strings (e.g., `#ffffff`) combined with numeric canvas properties like `globalAlpha` to avoid dynamic string creation in hot code paths.
