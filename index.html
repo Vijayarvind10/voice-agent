@@ -2504,11 +2504,14 @@
         }
         function drawStars() {
           sCtx.clearRect(0, 0, canvas.width, canvas.height);
+          sCtx.fillStyle = '#ffffff'; // ⚡ Bolt: Use constant color to avoid string allocation in loop
           stars.forEach(s => {
             s.a += s.s; if (s.a > 1) s.s = -Math.abs(s.s); if (s.a < 0.1) s.s = Math.abs(s.s);
             sCtx.beginPath(); sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-            sCtx.fillStyle = `rgba(255,255,255,${s.a * 0.4})`; sCtx.fill();
+            sCtx.globalAlpha = s.a * 0.4; // ⚡ Bolt: Use globalAlpha instead of rgba() string interpolation
+            sCtx.fill();
           });
+          sCtx.globalAlpha = 1.0; // Reset alpha for other draws
           requestAnimationFrame(drawStars);
         }
         initStars(); drawStars();
