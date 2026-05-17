@@ -108,12 +108,9 @@ def escape_osascript(s: str) -> str:
     """Escape user input for safe embedding in AppleScript strings."""
     return s.replace('\\', '\\\\').replace('"', '\\"').replace("'", "\\'")
 
-def run_osascript(script: str) -> str:
-    try:
-        r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=10)
-        return r.stdout.strip() or r.stderr.strip() or "ok"
-    except Exception as e:
-        return str(e)
+async def run_osascript(script: str) -> str:
+    # ⚡ Bolt: Use async run_cmd to prevent event loop stalls instead of blocking subprocess.run
+    return await run_cmd(["osascript", "-e", script], timeout=10)
 
 async def run_cmd(args: list, timeout=5) -> str:
     try:
@@ -405,6 +402,9 @@ def route_check(plan, network_mode):
             "label": plan["routeType"].upper() + " route", "servers": plan["servers"]}
 
 
+# Background tasks registry
+background_tasks = set()
+
 # ── Real Execution ────────────────────────────────────────────────────
 async def execute(plan: dict) -> dict:
     intent = plan["intent"]
@@ -431,9 +431,15 @@ async def execute(plan: dict) -> dict:
     if intent == "SET_TIMER":
         secs = p.get("seconds", 600)
         dur = p.get("duration", "10 minutes")
-        run_osascript(f'display notification "Timer set for {dur}" with title "Voice MCP" sound name "Tink"')
-        subprocess.Popen(["bash", "-c",
-            f'sleep {secs} && osascript -e \'display notification "⏱ Timer done!" with title "Voice MCP" sound name "Glass"\''])
+        # ⚡ Bolt: Await async run_osascript and use asyncio.create_task for the background timer instead of blocking subprocess.Popen
+        await run_osascript(f'display notification "Timer set for {dur}" with title "Voice MCP" sound name "Tink"')
+        async def timer_task(s):
+            await asyncio.sleep(s)
+            await run_osascript('display notification "⏱ Timer done!" with title "Voice MCP" sound name "Glass"')
+        task = asyncio.create_task(timer_task(secs))
+        # Keep a strong reference to prevent garbage collection before the task finishes
+        background_tasks.add(task)
+        task.add_done_callback(background_tasks.discard)
         return {"log": f"timer · armed for {dur}", "entityId": f"timer_{uid()}",
                 "response": f"Timer set for {dur}"}
 
@@ -447,9 +453,10 @@ async def execute(plan: dict) -> dict:
         loc = p.get("location", "")
         loc_param = urllib.parse.quote_plus(loc) if loc else ""
         try:
-            r = subprocess.run(["curl", "-s", f"https://wttr.in/{loc_param}?format=3"], capture_output=True, text=True, timeout=5)
-            weather = r.stdout.strip() or "Weather data unavailable"
-        except:
+            # ⚡ Bolt: Await async run_cmd instead of blocking subprocess.run
+            r_out = await run_cmd(["curl", "-s", f"https://wttr.in/{loc_param}?format=3"], timeout=5)
+            weather = r_out.strip() if r_out != "ok" and r_out else "Weather data unavailable"
+        except Exception:
             weather = "Could not fetch weather"
         return {"log": f"weather · {loc or 'local'}", "entityId": f"weather_{uid()}",
                 "response": weather}
@@ -483,21 +490,21 @@ async def execute(plan: dict) -> dict:
 
     if intent == "VOLUME_CONTROL":
         if p.get("mute"):
-            run_osascript('set volume with output muted')
+            await run_osascript('set volume with output muted')
             return {"log": "volume · muted", "entityId": f"vol_{uid()}", "response": "Volume muted"}
         if p.get("unmute"):
-            run_osascript('set volume without output muted')
+            await run_osascript('set volume without output muted')
             return {"log": "volume · unmuted", "entityId": f"vol_{uid()}", "response": "Volume unmuted"}
         level = p.get("level")
         if level is not None:
             apple_vol = max(0, min(100, level)) / 100 * 7
-            run_osascript(f'set volume output volume {level}')
+            await run_osascript(f'set volume output volume {level}')
             return {"log": f"volume · set to {level}%", "entityId": f"vol_{uid()}", "response": f"Volume set to {level}%"}
         return {"log": "volume · no action", "entityId": f"vol_{uid()}", "response": "Say 'set volume to 50' or 'mute'"}
 
     if intent == "CREATE_NOTE":
         body = escape_osascript(p.get("body", "Note from Voice MCP"))
-        run_osascript(f'''
+        await run_osascript(f'''
             tell application "Notes"
                 activate
                 tell account "iCloud"
@@ -510,7 +517,7 @@ async def execute(plan: dict) -> dict:
 
     if intent == "CREATE_REMINDER":
         body = escape_osascript(p.get("body", "Reminder"))
-        run_osascript(f'''
+        await run_osascript(f'''
             tell application "Reminders"
                 activate
                 tell list "Reminders"
@@ -553,7 +560,7 @@ async def execute(plan: dict) -> dict:
 
     if intent == "CREATE_EVENT":
         run_open("/System/Applications/Calendar.app")
-        run_osascript('tell application "Calendar" to activate')
+        await run_osascript('tell application "Calendar" to activate')
         return {"log": "calendar · opened", "entityId": f"event_{uid()}", "response": "Opening Calendar"}
 
     if intent == "OPEN_APP":
@@ -626,8 +633,10 @@ async def execute(plan: dict) -> dict:
             my_ip = m.group(1) if m else "127.0.0.1"
             if my_ip == "127.0.0.1":
                 # Try another way
-                my_ip = subprocess.getoutput("hostname -I").split()[0]
-        except:
+                # ⚡ Bolt: Await async run_cmd to prevent event loop stall instead of blocking subprocess.getoutput
+                out = await run_cmd(["hostname", "-I"])
+                my_ip = out.split()[0] if out and out != "ok" else "Unknown"
+        except Exception:
             my_ip = "Unknown"
         return {"log": "ip · fetched", "entityId": f"ip_{uid()}", "response": f"Your IP address is {my_ip}"}
 
