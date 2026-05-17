@@ -1,0 +1,3 @@
+## 2026-05-17 - Avoid synchronous blocking subprocess calls in async FastAPI
+**Learning:** Using synchronous `subprocess.run` or `subprocess.getoutput` inside async route handlers (like `execute`) completely stalls the asyncio event loop for all concurrent connections, causing massive latency spikes (e.g., hundreds of ms). This codebase-specific bottleneck happens because `run_osascript` and intent handlers like `GET_WEATHER` block while running shell commands.
+**Action:** Always replace blocking `subprocess` calls with asynchronous alternatives. In this codebase, use the existing `await run_cmd()` (which wraps `asyncio.create_subprocess_exec`) to safely execute shell commands without blocking the event loop.
