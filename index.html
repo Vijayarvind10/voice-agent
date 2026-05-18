@@ -2502,13 +2502,17 @@
             r: Math.random() * 1.2 + 0.3, a: Math.random(), s: Math.random() * 0.003 + 0.001
           }));
         }
+        // ⚡ Bolt: Use globalAlpha instead of dynamic rgba strings to reduce GC pressure
         function drawStars() {
           sCtx.clearRect(0, 0, canvas.width, canvas.height);
+          sCtx.fillStyle = '#ffffff';
           stars.forEach(s => {
             s.a += s.s; if (s.a > 1) s.s = -Math.abs(s.s); if (s.a < 0.1) s.s = Math.abs(s.s);
+            sCtx.globalAlpha = s.a * 0.4;
             sCtx.beginPath(); sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-            sCtx.fillStyle = `rgba(255,255,255,${s.a * 0.4})`; sCtx.fill();
+            sCtx.fill();
           });
+          sCtx.globalAlpha = 1.0;
           requestAnimationFrame(drawStars);
         }
         initStars(); drawStars();
@@ -2703,14 +2707,23 @@
             drawVis();
           }).catch(() => { });
         }
+        // ⚡ Bolt: Hoist typed array and use constant color strings to reduce GC pressure
+        let visDataArray = null;
+        const VIS_LAYERS = 3;
+        const visColors = Array.from({ length: VIS_LAYERS }, (_, j) =>
+          `rgba(${100+j*50}, ${150+j*30}, 255, 0.3)`
+        );
         function drawVis() {
           if (!analyser) return;
-          const data = new Uint8Array(analyser.frequencyBinCount);
-          analyser.getByteFrequencyData(data);
+          if (!visDataArray || visDataArray.length !== analyser.frequencyBinCount) {
+             visDataArray = new Uint8Array(analyser.frequencyBinCount);
+          }
+          analyser.getByteFrequencyData(visDataArray);
+          const data = visDataArray;
           const w = dom.micVis.width, h = dom.micVis.height, cx = w / 2, cy = h / 2;
           visCtx.clearRect(0, 0, w, h);
           const time = Date.now() * 0.003;
-          for (let j = 0; j < 3; j++) {
+          for (let j = 0; j < VIS_LAYERS; j++) {
             visCtx.beginPath();
             const count = 30;
             for (let i = 0; i <= count; i++) {
@@ -2723,7 +2736,7 @@
               if (i === 0) visCtx.moveTo(x, y); else visCtx.lineTo(x, y);
             }
             visCtx.closePath();
-            visCtx.fillStyle = `rgba(${100+j*50}, ${150+j*30}, 255, 0.3)`;
+            visCtx.fillStyle = visColors[j];
             visCtx.fill();
           }
           visRAF = requestAnimationFrame(drawVis);
