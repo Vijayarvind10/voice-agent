@@ -2502,13 +2502,17 @@
             r: Math.random() * 1.2 + 0.3, a: Math.random(), s: Math.random() * 0.003 + 0.001
           }));
         }
+        // ⚡ Bolt: Optimize drawStars by removing per-frame string allocations
         function drawStars() {
           sCtx.clearRect(0, 0, canvas.width, canvas.height);
+          sCtx.fillStyle = '#ffffff'; // Set once per frame
           stars.forEach(s => {
             s.a += s.s; if (s.a > 1) s.s = -Math.abs(s.s); if (s.a < 0.1) s.s = Math.abs(s.s);
+            sCtx.globalAlpha = s.a * 0.4; // Mutate globalAlpha instead of string interpolation
             sCtx.beginPath(); sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-            sCtx.fillStyle = `rgba(255,255,255,${s.a * 0.4})`; sCtx.fill();
+            sCtx.fill();
           });
+          sCtx.globalAlpha = 1.0; // Reset
           requestAnimationFrame(drawStars);
         }
         initStars(); drawStars();
@@ -2703,10 +2707,17 @@
             drawVis();
           }).catch(() => { });
         }
+        // ⚡ Bolt: Pre-allocate array and colors to prevent GC pressure and micro-stutters
+        let visDataArray = null;
+        const visColors = ['rgba(100, 150, 255, 0.3)', 'rgba(150, 180, 255, 0.3)', 'rgba(200, 210, 255, 0.3)'];
+
         function drawVis() {
           if (!analyser) return;
-          const data = new Uint8Array(analyser.frequencyBinCount);
-          analyser.getByteFrequencyData(data);
+          if (!visDataArray || visDataArray.length !== analyser.frequencyBinCount) {
+            visDataArray = new Uint8Array(analyser.frequencyBinCount);
+          }
+          analyser.getByteFrequencyData(visDataArray);
+          const data = visDataArray;
           const w = dom.micVis.width, h = dom.micVis.height, cx = w / 2, cy = h / 2;
           visCtx.clearRect(0, 0, w, h);
           const time = Date.now() * 0.003;
@@ -2723,7 +2734,7 @@
               if (i === 0) visCtx.moveTo(x, y); else visCtx.lineTo(x, y);
             }
             visCtx.closePath();
-            visCtx.fillStyle = `rgba(${100+j*50}, ${150+j*30}, 255, 0.3)`;
+            visCtx.fillStyle = visColors[j];
             visCtx.fill();
           }
           visRAF = requestAnimationFrame(drawVis);
