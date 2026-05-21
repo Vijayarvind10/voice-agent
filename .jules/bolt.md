@@ -1,0 +1,3 @@
+## 2025-01-20 - [Performance] Canvas Animation Loop Garbage Collection Bottleneck
+**Learning:** In high-frequency animation loops (like `drawVis` and `drawStars` running in `requestAnimationFrame`), dynamic string interpolations (e.g., `` `rgba(255,255,255,${s.a * 0.4})` ``) and repetitive array allocations (e.g., `new Uint8Array(length)`) create significant Garbage Collection (GC) pressure. This leads to micro-stutters and measurable performance degradation.
+**Action:** When working with canvas animation loops, always hoist reusable data structures (like `Uint8Array`) globally. For dynamically changing colors based on alpha, use a constant `fillStyle` string and instead manipulate `context.globalAlpha` or pre-calculate an array of fixed colors.
