@@ -2504,11 +2504,15 @@
         }
         function drawStars() {
           sCtx.clearRect(0, 0, canvas.width, canvas.height);
+          // ⚡ Bolt: Use constant fillStyle and globalAlpha to avoid ~7,200 string allocations per second
+          sCtx.fillStyle = '#ffffff';
           stars.forEach(s => {
             s.a += s.s; if (s.a > 1) s.s = -Math.abs(s.s); if (s.a < 0.1) s.s = Math.abs(s.s);
+            sCtx.globalAlpha = s.a * 0.4;
             sCtx.beginPath(); sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-            sCtx.fillStyle = `rgba(255,255,255,${s.a * 0.4})`; sCtx.fill();
+            sCtx.fill();
           });
+          sCtx.globalAlpha = 1.0; // Reset alpha for other canvas operations
           requestAnimationFrame(drawStars);
         }
         initStars(); drawStars();
@@ -2703,10 +2707,20 @@
             drawVis();
           }).catch(() => { });
         }
+        // ⚡ Bolt: Hoist Uint8Array and color strings out of animation loop to reduce GC pressure
+        let visDataArray = null;
+        const visColors = [
+          'rgba(100, 150, 255, 0.3)',
+          'rgba(150, 180, 255, 0.3)',
+          'rgba(200, 210, 255, 0.3)'
+        ];
+
         function drawVis() {
           if (!analyser) return;
-          const data = new Uint8Array(analyser.frequencyBinCount);
-          analyser.getByteFrequencyData(data);
+          if (!visDataArray || visDataArray.length !== analyser.frequencyBinCount) {
+             visDataArray = new Uint8Array(analyser.frequencyBinCount);
+          }
+          analyser.getByteFrequencyData(visDataArray);
           const w = dom.micVis.width, h = dom.micVis.height, cx = w / 2, cy = h / 2;
           visCtx.clearRect(0, 0, w, h);
           const time = Date.now() * 0.003;
@@ -2715,15 +2729,15 @@
             const count = 30;
             for (let i = 0; i <= count; i++) {
               const angle = (i / count) * Math.PI * 2;
-              const dIdx = Math.floor((i / count) * data.length * 0.5);
-              const val = (data[dIdx] || 0) / 255;
+              const dIdx = Math.floor((i / count) * visDataArray.length * 0.5);
+              const val = (visDataArray[dIdx] || 0) / 255;
               const r = 18 + val * 14 + Math.sin(angle * 3 + time + j) * 3;
               const x = cx + Math.cos(angle) * r;
               const y = cy + Math.sin(angle) * r;
               if (i === 0) visCtx.moveTo(x, y); else visCtx.lineTo(x, y);
             }
             visCtx.closePath();
-            visCtx.fillStyle = `rgba(${100+j*50}, ${150+j*30}, 255, 0.3)`;
+            visCtx.fillStyle = visColors[j];
             visCtx.fill();
           }
           visRAF = requestAnimationFrame(drawVis);
