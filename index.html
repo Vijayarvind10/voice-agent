@@ -2502,13 +2502,17 @@
             r: Math.random() * 1.2 + 0.3, a: Math.random(), s: Math.random() * 0.003 + 0.001
           }));
         }
+        /* ⚡ Bolt: Optimized canvas rendering - avoid string allocation (rgba) per frame to reduce GC pressure */
         function drawStars() {
           sCtx.clearRect(0, 0, canvas.width, canvas.height);
+          sCtx.fillStyle = '#ffffff';
           stars.forEach(s => {
             s.a += s.s; if (s.a > 1) s.s = -Math.abs(s.s); if (s.a < 0.1) s.s = Math.abs(s.s);
             sCtx.beginPath(); sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-            sCtx.fillStyle = `rgba(255,255,255,${s.a * 0.4})`; sCtx.fill();
+            sCtx.globalAlpha = s.a * 0.4;
+            sCtx.fill();
           });
+          sCtx.globalAlpha = 1; // reset
           requestAnimationFrame(drawStars);
         }
         initStars(); drawStars();
@@ -2685,6 +2689,13 @@
         /* ── Audio visualizer ─── */
         const visCtx = dom.micVis.getContext('2d');
         let visRAF = null;
+        /* ⚡ Bolt: Hoisted Uint8Array out of animation loop and pre-calculated visualizer colors to prevent GC pressure */
+        let visDataArray = null;
+        const visColors = [
+          `rgba(${100}, ${150}, 255, 0.3)`,
+          `rgba(${150}, ${180}, 255, 0.3)`,
+          `rgba(${200}, ${210}, 255, 0.3)`
+        ];
         function startAudioVis() {
           // Bug 8 fix: track pending promise to prevent AudioContext leaks
           const micPromiseId = {};
@@ -2699,14 +2710,14 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioCtx.createAnalyser();
             analyser.fftSize = 64;
+            visDataArray = new Uint8Array(analyser.frequencyBinCount);
             audioCtx.createMediaStreamSource(stream).connect(analyser);
             drawVis();
           }).catch(() => { });
         }
         function drawVis() {
-          if (!analyser) return;
-          const data = new Uint8Array(analyser.frequencyBinCount);
-          analyser.getByteFrequencyData(data);
+          if (!analyser || !visDataArray) return;
+          analyser.getByteFrequencyData(visDataArray);
           const w = dom.micVis.width, h = dom.micVis.height, cx = w / 2, cy = h / 2;
           visCtx.clearRect(0, 0, w, h);
           const time = Date.now() * 0.003;
@@ -2715,15 +2726,15 @@
             const count = 30;
             for (let i = 0; i <= count; i++) {
               const angle = (i / count) * Math.PI * 2;
-              const dIdx = Math.floor((i / count) * data.length * 0.5);
-              const val = (data[dIdx] || 0) / 255;
+              const dIdx = Math.floor((i / count) * visDataArray.length * 0.5);
+              const val = (visDataArray[dIdx] || 0) / 255;
               const r = 18 + val * 14 + Math.sin(angle * 3 + time + j) * 3;
               const x = cx + Math.cos(angle) * r;
               const y = cy + Math.sin(angle) * r;
               if (i === 0) visCtx.moveTo(x, y); else visCtx.lineTo(x, y);
             }
             visCtx.closePath();
-            visCtx.fillStyle = `rgba(${100+j*50}, ${150+j*30}, 255, 0.3)`;
+            visCtx.fillStyle = visColors[j];
             visCtx.fill();
           }
           visRAF = requestAnimationFrame(drawVis);
