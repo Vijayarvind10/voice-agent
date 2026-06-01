@@ -1,0 +1,3 @@
+## 2026-06-01 - Animation Loop Garbage Collection Pressure
+**Learning:** Found a codebase-specific performance anti-pattern in `index.html`. Animation loops powered by `requestAnimationFrame` (`drawStars` and `drawVis`) allocate a new `Uint8Array` each frame and rely heavily on dynamic template string interpolation for generating colors (e.g., ``rgba(${r}, ${g}, ${b}, ${a})``). This constant reallocation inside a 60fps loop generates significant garbage collection pressure, causing micro-stutters in the UI.
+**Action:** Always hoist object and array allocations out of animation loops. Precalculate colors in an array during initialization or use mutations like `globalAlpha` combined with a constant `fillStyle` instead of dynamic string evaluation per frame.
